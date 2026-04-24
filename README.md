@@ -27,7 +27,7 @@ read left-to-right:
 No magic store replacement. No new state model. Just a tiny userland helper for
 making dense middleware stacks readable again.
 
-This package is based on the idea discussed in [pmndrs/zustand#3449](https://github.com/pmndrs/zustand/discussions/3449). The maintainer response was that this direction is fine for a third-party/userland helper, but it is not currently recommended or documented as the official Zustand style.
+This package is based on the idea discussed in [pmndrs/zustand#3449](https://github.com/pmndrs/zustand/discussions/3449).
 
 ## The problem: middleware stacks read backwards
 

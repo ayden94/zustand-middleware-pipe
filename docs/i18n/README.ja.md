@@ -20,7 +20,7 @@ Zustand の通常の inside-out なミドルウェア記法は強力です。た
 
 魔法の store replacement ではありません。新しい state model でもありません。密度の高い middleware stack をもう一度読みやすくする、小さな userland helper です。
 
-この package は [pmndrs/zustand#3449](https://github.com/pmndrs/zustand/discussions/3449) で議論されたアイデアをもとにしています。maintainer の回答では、この方向性は third-party/userland helper としては問題ないものの、現時点で公式 Zustand style として推奨・文書化されているわけではない、という位置づけでした。
+この package は [pmndrs/zustand#3449](https://github.com/pmndrs/zustand/discussions/3449) で議論されたアイデアをもとにしています。
 
 ## 問題: middleware stack は逆向きに読まされる
 

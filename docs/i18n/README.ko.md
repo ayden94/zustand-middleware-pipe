@@ -20,7 +20,7 @@ Zustand의 기본 inside-out 미들웨어 스타일은 강력합니다. 하지�
 
 마법 같은 store 대체도 아니고, 새로운 상태 모델도 아닙니다. 빽빽한 미들웨어 스택을 다시 읽기 좋게 만드는 작은 userland helper입니다.
 
-이 패키지는 [pmndrs/zustand#3449](https://github.com/pmndrs/zustand/discussions/3449)에서 논의된 아이디어를 바탕으로 합니다. maintainer의 답변은 이 방향이 third-party/userland helper로는 괜찮지만, 현재 공식 Zustand 스타일로 권장되거나 문서화된 방식은 아니라는 내용이었습니다.
+이 패키지는 [pmndrs/zustand#3449](https://github.com/pmndrs/zustand/discussions/3449)에서 논의된 아이디어를 바탕으로 합니다.
 
 ## 문제: 미들웨어 스택은 거꾸로 읽힙니다
 
