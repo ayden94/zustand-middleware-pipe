@@ -1,0 +1,46 @@
+{
+  "name": "zustand-middleware-pipe",
+  "version": "0.0.1",
+  "description": "Experimental userland helper for composing Zustand middlewares left-to-right.",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "keywords": [
+    "zustand",
+    "middleware",
+    "pipe",
+    "state-management"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "main": "./dist/index.js",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "verify": "npm run typecheck && npm run test && npm run build"
+  },
+  "peerDependencies": {
+    "immer": ">=9.0.6",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.11",
+    "immer": "^10.1.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "zustand": "^5.0.8"
+  }
+}
