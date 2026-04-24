@@ -52,31 +52,31 @@ describe('pipe', () => {
   })
 
   it('composes Zustand middleware wrappers while preserving store extensions', () => {
-    const baseCreator = definePipeStateCreator(
-      ['immer', 'persist', 'subscribeWithSelector', 'devtools'],
-      (set): CounterState => ({
-        count: 0,
-        label: 'counter',
-        inc: () => {
-          set(
-            (state) => {
-              state.count += 1
-            },
-            false,
-            'counter/inc',
-          )
-        },
-        setLabel: (label) => {
-          set({ label }, false, 'counter/setLabel')
-        },
-      }),
-    )
+    const baseCreator = definePipeStateCreator<
+      CounterState,
+      'immer' | 'persist' | 'subscribeWithSelector' | 'devtools'
+    >((set) => ({
+      count: 0,
+      label: 'counter',
+      inc: () => {
+        set(
+          (state) => {
+            state.count += 1
+          },
+          false,
+          'counter/inc',
+        )
+      },
+      setLabel: (label) => {
+        set({ label }, false, 'counter/setLabel')
+      },
+    }))
 
     expectTypeOf(baseCreator).toEqualTypeOf<
       StateCreator<
         CounterState,
         PipeMiddlewareStack<
-          ['immer', 'persist', 'subscribeWithSelector', 'devtools']
+          'immer' | 'persist' | 'subscribeWithSelector' | 'devtools'
         >,
         [],
         CounterState
@@ -124,28 +124,28 @@ describe('pipe', () => {
   })
 
   it('allows pipe creators without immer when the stack omits immer', () => {
-    const baseCreator = definePipeStateCreator(
-      ['persist', 'subscribeWithSelector', 'devtools'],
-      (set): CounterState => ({
-        count: 0,
-        label: 'counter',
-        inc: () => {
-          set(
-            (state) => ({ count: state.count + 1 }),
-            false,
-            'counter/inc',
-          )
-        },
-        setLabel: (label) => {
-          set({ label }, false, 'counter/setLabel')
-        },
-      }),
-    )
+    const baseCreator = definePipeStateCreator<
+      CounterState,
+      'persist' | 'subscribeWithSelector' | 'devtools'
+    >((set) => ({
+      count: 0,
+      label: 'counter',
+      inc: () => {
+        set(
+          (state) => ({ count: state.count + 1 }),
+          false,
+          'counter/inc',
+        )
+      },
+      setLabel: (label) => {
+        set({ label }, false, 'counter/setLabel')
+      },
+    }))
 
     expectTypeOf(baseCreator).toEqualTypeOf<
       StateCreator<
         CounterState,
-        PipeMiddlewareStack<['persist', 'subscribeWithSelector', 'devtools']>,
+        PipeMiddlewareStack<'persist' | 'subscribeWithSelector' | 'devtools'>,
         [],
         CounterState
       >

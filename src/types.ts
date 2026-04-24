@@ -29,14 +29,19 @@ type PipeMiddlewareMutator<Name extends PipeMiddlewareName> =
           ? ['zustand/immer', never]
           : never
 
+type IncludePipeMiddleware<
+  Names extends PipeMiddlewareName,
+  Name extends PipeMiddlewareName,
+> = Name extends Names ? [PipeMiddlewareMutator<Name>] : []
+
 export type PipeMiddlewareStack<
-  Names extends readonly PipeMiddlewareName[],
+  Names extends PipeMiddlewareName = never,
 > = PipeMiddlewareTypesLoaded &
-  (Names extends readonly [
-    infer First extends PipeMiddlewareName,
-    ...infer Rest extends PipeMiddlewareName[],
+  [
+    ...IncludePipeMiddleware<Names, 'devtools'>,
+    ...IncludePipeMiddleware<Names, 'subscribeWithSelector'>,
+    ...IncludePipeMiddleware<Names, 'persist'>,
+    ...IncludePipeMiddleware<Names, 'immer'>,
   ]
-    ? [...PipeMiddlewareStack<Rest>, PipeMiddlewareMutator<First>]
-    : [])
 
 export type StateCreatorPipeStep<Input, Output> = (stateCreator: Input) => Output
