@@ -28,6 +28,12 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc -p tsconfig.build.json",
+    "example:install": "npm run build && npm install --prefix examples",
+    "example:dev": "npm run build && npm run dev --prefix examples",
+    "example:build": "npm run build && npm run build --prefix examples",
+    "example:lint": "npm run lint --prefix examples",
+    "example:preview": "npm run preview --prefix examples",
+    "example:verify": "npm run example:build && npm run example:lint",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "verify": "npm run typecheck && npm run test && npm run build"

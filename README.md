@@ -135,3 +135,14 @@ npm run verify
 ```
 
 `npm run verify` runs typecheck, Vitest, and declaration build.
+
+## Example
+
+The Vite React example lives in `examples/` and uses this package through a local `file:..` dependency.
+
+```sh
+npm run example:install
+npm run example:dev
+```
+
+Use `npm run example:verify` to build and lint the example from the package root.
