@@ -1,10 +1,35 @@
 # zustand-middleware-pipe
 
-Experimental userland helper for composing Zustand middlewares left-to-right.
+Translations: [한국어](docs/i18n/README.ko.md) · [日本語](docs/i18n/README.ja.md)
+
+Write stacked Zustand middleware in the order you actually think about it.
+
+If you have ever mixed `immer`, `persist`, `subscribeWithSelector`, and
+`devtools` in one Zustand store, you have probably had this moment:
+
+> “Wait... which options belong to which middleware again?”
+
+Zustand's normal inside-out middleware style is powerful, but once the stack
+gets real, the code starts reading backwards. `persist` options sit in the
+middle, `devtools` wraps everything from the outside, `immer` changes the `set`
+type from the inside, and the next person has to mentally unwrap the whole
+thing just to understand the store setup.
+
+`zustand-middleware-pipe` keeps the same runtime behavior, but lets the setup
+read left-to-right:
+
+1. define the base creator
+2. add Immer
+3. add Persist
+4. add selector subscriptions
+5. add DevTools
+
+No magic store replacement. No new state model. Just a tiny userland helper for
+making dense middleware stacks readable again.
 
 This package is based on the idea discussed in [pmndrs/zustand#3449](https://github.com/pmndrs/zustand/discussions/3449). The maintainer response was that this direction is fine for a third-party/userland helper, but it is not currently recommended or documented as the official Zustand style.
 
-## Why this exists
+## The problem: middleware stacks read backwards
 
 Zustand middleware stacks are normally written inside-out:
 
@@ -27,6 +52,11 @@ const store = createStore<CounterState>()(
   ),
 )
 ```
+
+This is correct Zustand code, but the shape gets harder to scan as the stack
+grows. The runtime order is hidden in the nesting.
+
+## The fix: write the stack as a pipeline
 
 This helper lets the same runtime order be written left-to-right:
 
@@ -57,7 +87,7 @@ const store = createStore<CounterState>()(
 )
 ```
 
-The example above evaluates to:
+That code evaluates to the same nested middleware stack:
 
 ```ts
 devtools(subscribeWithSelector(persist(immer(baseCreator), options)), options)
@@ -105,6 +135,34 @@ const store = createStore<CounterState>()(
     withPersist<CounterState>({ name: 'counter' }),
     withSubscribeWithSelector(),
     withDevtools({ name: 'CounterStore' }),
+  ),
+)
+```
+
+The middleware union is also a type-safety contract. If you declare `immer` in
+`definePipeStateCreator` but forget `withImmer()` in `pipe(...)`, TypeScript
+rejects the stack because the base creator still expects the Immer mutator to be
+consumed. The opposite mismatch is rejected too: adding `withImmer()` while
+omitting `immer` from the union makes the wrapper expect a different input
+stack.
+
+```ts
+const baseCreator = definePipeStateCreator<
+  CounterState,
+  'immer' | 'persist'
+>((set) => ({
+  count: 0,
+  inc: () =>
+    set((state) => {
+      state.count += 1
+    }),
+}))
+
+createStore<CounterState>()(
+  pipe(
+    baseCreator,
+    // withImmer(), // TypeScript error when this wrapper is missing
+    withPersist<CounterState>({ name: 'counter' }),
   ),
 )
 ```

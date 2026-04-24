@@ -5,6 +5,14 @@
   "type": "module",
   "license": "MIT",
   "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ayden94/zustand-middleware-pipe.git"
+  },
+  "homepage": "https://github.com/ayden94/zustand-middleware-pipe#readme",
+  "bugs": {
+    "url": "https://github.com/ayden94/zustand-middleware-pipe/issues"
+  },
   "keywords": [
     "zustand",
     "middleware",
@@ -15,7 +23,8 @@
     "access": "public"
   },
   "files": [
-    "dist"
+    "dist",
+    "docs/i18n"
   ],
   "exports": {
     ".": {
@@ -28,9 +37,9 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc -p tsconfig.build.json",
-    "example:install": "npm run build && npm install --prefix examples",
-    "example:dev": "npm run build && npm run dev --prefix examples",
-    "example:build": "npm run build && npm run build --prefix examples",
+    "example:install": "npm run build && rm -rf examples/node_modules/zustand-middleware-pipe && npm install --prefix examples --install-links",
+    "example:dev": "npm run example:install && npm run dev --prefix examples",
+    "example:build": "npm run example:install && npm run build --prefix examples",
     "example:lint": "npm run lint --prefix examples",
     "example:preview": "npm run preview --prefix examples",
     "example:verify": "npm run example:build && npm run example:lint",
