@@ -1,6 +1,6 @@
 {
   "name": "zustand-middleware-pipe",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Experimental userland helper for composing Zustand middlewares left-to-right.",
   "type": "module",
   "license": "MIT",

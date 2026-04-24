@@ -2,12 +2,14 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createJSONStorage, type StateStorage } from 'zustand/middleware'
 import { createStore, type StateCreator } from 'zustand/vanilla'
 import {
+  definePipeStateCreator,
   pipe,
   pipeStateCreator,
   withDevtools,
   withImmer,
   withPersist,
   withSubscribeWithSelector,
+  type PipeMiddlewareStack,
 } from '../src/index.js'
 
 interface CounterState {
@@ -18,13 +20,6 @@ interface CounterState {
 }
 
 type PersistedCounterState = Pick<CounterState, 'count'>
-
-type CounterMiddlewareStack = [
-  ['zustand/devtools', never],
-  ['zustand/subscribeWithSelector', never],
-  ['zustand/persist', unknown],
-  ['zustand/immer', never],
-]
 
 function createMemoryStorage(): StateStorage {
   const values = new Map<string, string>()
@@ -57,27 +52,36 @@ describe('pipe', () => {
   })
 
   it('composes Zustand middleware wrappers while preserving store extensions', () => {
-    const baseCreator: StateCreator<
-      CounterState,
-      CounterMiddlewareStack,
-      [],
-      CounterState
-    > = (set) => ({
-      count: 0,
-      label: 'counter',
-      inc: () => {
-        set(
-          (state) => {
-            state.count += 1
-          },
-          false,
-          'counter/inc',
-        )
-      },
-      setLabel: (label) => {
-        set({ label }, false, 'counter/setLabel')
-      },
-    })
+    const baseCreator = definePipeStateCreator(
+      ['immer', 'persist', 'subscribeWithSelector', 'devtools'],
+      (set): CounterState => ({
+        count: 0,
+        label: 'counter',
+        inc: () => {
+          set(
+            (state) => {
+              state.count += 1
+            },
+            false,
+            'counter/inc',
+          )
+        },
+        setLabel: (label) => {
+          set({ label }, false, 'counter/setLabel')
+        },
+      }),
+    )
+
+    expectTypeOf(baseCreator).toEqualTypeOf<
+      StateCreator<
+        CounterState,
+        PipeMiddlewareStack<
+          ['immer', 'persist', 'subscribeWithSelector', 'devtools']
+        >,
+        [],
+        CounterState
+      >
+    >()
 
     const store = createStore<CounterState>()(
       pipe(
@@ -117,5 +121,55 @@ describe('pipe', () => {
     expect(store.persist.hasHydrated()).toBe(true)
 
     unsubscribe()
+  })
+
+  it('allows pipe creators without immer when the stack omits immer', () => {
+    const baseCreator = definePipeStateCreator(
+      ['persist', 'subscribeWithSelector', 'devtools'],
+      (set): CounterState => ({
+        count: 0,
+        label: 'counter',
+        inc: () => {
+          set(
+            (state) => ({ count: state.count + 1 }),
+            false,
+            'counter/inc',
+          )
+        },
+        setLabel: (label) => {
+          set({ label }, false, 'counter/setLabel')
+        },
+      }),
+    )
+
+    expectTypeOf(baseCreator).toEqualTypeOf<
+      StateCreator<
+        CounterState,
+        PipeMiddlewareStack<['persist', 'subscribeWithSelector', 'devtools']>,
+        [],
+        CounterState
+      >
+    >()
+
+    const store = createStore<CounterState>()(
+      pipe(
+        baseCreator,
+        withPersist<CounterState, PersistedCounterState>({
+          name: 'counter-without-immer',
+          storage: createJSONStorage<PersistedCounterState>(() =>
+            createMemoryStorage(),
+          ),
+          partialize: (state) => ({ count: state.count }),
+        }),
+        withSubscribeWithSelector(),
+        withDevtools({ name: 'CounterStoreWithoutImmer', enabled: false }),
+      ),
+    )
+
+    store.getState().inc()
+    store.setState({ count: 2 }, false, 'counter/setCount')
+
+    expect(store.getState().count).toBe(2)
+    expect(store.persist.hasHydrated()).toBe(true)
   })
 })
