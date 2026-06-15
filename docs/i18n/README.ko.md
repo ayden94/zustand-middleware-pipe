@@ -118,9 +118,6 @@ pipe.use(immer())
   .use(devtools(options?))
   .create(baseCreator)
 
-definePipeStateCreator<T, Middlewares>(baseCreator)
-pipe(base, ...wrappers)
-pipeStateCreator(base, ...wrappers) // compatibility alias
 immer()
 persist<T, PersistedState = T, PersistReturn = unknown>(options)
 subscribeWithSelector()
@@ -141,8 +138,6 @@ import {
 ```
 
 root entry point는 middleware wrapper를 import하지 않습니다. middleware barrel도 `immer`를 import하지 않으므로, `persist`, `subscribeWithSelector`, `devtools`만 쓰는 소비자는 optional Immer peer를 건드리지 않습니다. wrapper 이름은 Zustand의 원본 middleware 이름을 의도적으로 따르며, package subpath가 pipe-aware 버전을 구분합니다.
-
-`definePipeStateCreator<T, Middlewares>(baseCreator)`는 기존 `pipe(...)` composition 코드를 위해 유지됩니다. 새 store에서는 middleware list를 builder chain 하나로만 관리할 수 있는 `pipe.use(...)`를 권장합니다.
 
 ```ts
 const store = createStore<CounterState>()(
@@ -192,7 +187,6 @@ persist<CounterState, Pick<CounterState, 'count'>>({
 - 이미 잘 동작하는 store를 이 helper를 쓰기 위해 억지로 다시 작성하지 마세요.
 - built-in wrapper는 inner에서 outer 순서로 추가해야 합니다. 즉 `.use(immer())`, `.use(persist(...))`, `.use(subscribeWithSelector())`, `.use(devtools(...))` 순서입니다. 뒤집힌 built-in 순서는 `.use(...)`에서 거부됩니다.
 - Zustand의 devtools type은 `store.devtools`를 노출하지만, runtime property는 일반적인 Zustand devtools 동작에 의존합니다. 예를 들어 devtools가 비활성화되어 있거나 Redux DevTools extension이 없다면 사용할 수 없을 수 있습니다.
-- `definePipeStateCreator`는 compatibility API입니다. 새 코드에서는 `pipe.use(...)`와 unprefixed middleware wrapper를 권장합니다.
 - 임의의 third-party middleware composition은 runtime `reduce`만으로 해결되지 않습니다. wrapper에는 올바른 mutator tuple type이 필요합니다.
 
 ## 개발

@@ -83,39 +83,6 @@ export type PipeMiddlewareOrderGuard<
       readonly __pipeProducedMutators: Produced
     }
 
-export type PipeMiddlewareName =
-  | 'devtools'
-  | 'immer'
-  | 'persist'
-  | 'subscribeWithSelector'
-
-type PipeMiddlewareMutator<Name extends PipeMiddlewareName> =
-  Name extends 'devtools'
-    ? DevtoolsMutator
-    : Name extends 'subscribeWithSelector'
-      ? SubscribeWithSelectorMutator
-      : Name extends 'persist'
-        ? PersistMutator
-        : Name extends 'immer'
-          ? ImmerMutator
-          : never
-
-type IncludePipeMiddleware<
-  Names extends PipeMiddlewareName,
-  Name extends PipeMiddlewareName,
-> = Name extends Names ? [PipeMiddlewareMutator<Name>] : []
-
-export type PipeMiddlewareStack<
-  Names extends PipeMiddlewareName = never,
-> = [
-  ...IncludePipeMiddleware<Names, 'devtools'>,
-  ...IncludePipeMiddleware<Names, 'subscribeWithSelector'>,
-  ...IncludePipeMiddleware<Names, 'persist'>,
-  ...IncludePipeMiddleware<Names, 'immer'>,
-]
-
-export type StateCreatorPipeStep<Input, Output> = (stateCreator: Input) => Output
-
 export type PipeMiddleware<
   T,
   Consumed extends MutatorTuple,

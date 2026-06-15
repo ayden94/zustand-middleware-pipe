@@ -119,9 +119,6 @@ pipe.use(immer())
   .use(devtools(options?))
   .create(baseCreator)
 
-definePipeStateCreator<T, Middlewares>(baseCreator)
-pipe(base, ...wrappers)
-pipeStateCreator(base, ...wrappers) // compatibility alias
 immer()
 persist<T, PersistedState = T, PersistReturn = unknown>(options)
 subscribeWithSelector()
@@ -142,8 +139,6 @@ import {
 ```
 
 root entry point は middleware wrapper を import しません。middleware barrel も `immer` を import しないため、`persist`, `subscribeWithSelector`, `devtools` だけを使う consumer は optional Immer peer に触れません。wrapper 名は Zustand の元の middleware 名に意図的に合わせており、package subpath が pipe-aware 版であることを区別します。
-
-`definePipeStateCreator<T, Middlewares>(baseCreator)` は既存の `pipe(...)` composition code 向けに残しています。新しい store では middleware list を builder chain だけで管理できる `pipe.use(...)` を推奨します。
 
 ```ts
 const store = createStore<CounterState>()(
@@ -193,7 +188,6 @@ persist<CounterState, Pick<CounterState, 'count'>>({
 - すでに動いている store を、この helper を使うためだけに書き換えないでください。
 - built-in wrapper は inner から outer の順で追加してください。つまり `.use(immer())`, `.use(persist(...))`, `.use(subscribeWithSelector())`, `.use(devtools(...))` の順です。逆順の built-in wrapper は `.use(...)` で拒否されます。
 - Zustand の devtools type は `store.devtools` を公開しますが、runtime property は通常の Zustand devtools behavior に依存します。たとえば devtools が無効化されている場合や Redux DevTools extension がない場合は、利用できないことがあります。
-- `definePipeStateCreator` は compatibility API です。新しいコードでは `pipe.use(...)` と unprefixed middleware wrapper を推奨します。
 - 任意の third-party middleware composition は runtime `reduce` だけでは解決できません。wrapper には正しい mutator tuple type が必要です。
 
 ## Development
