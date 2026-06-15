@@ -1,6 +1,6 @@
 {
   "name": "zustand-middleware-pipe",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "Experimental userland helper for composing Zustand middlewares left-to-right.",
   "type": "module",
   "license": "MIT",
@@ -30,6 +30,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./middleware": {
+      "types": "./dist/middleware.d.ts",
+      "import": "./dist/middleware.js"
+    },
+    "./middleware/immer": {
+      "types": "./dist/middleware/immer.d.ts",
+      "import": "./dist/middleware/immer.js"
     }
   },
   "types": "./dist/index.d.ts",
@@ -51,11 +59,16 @@
     "immer": ">=9.0.6",
     "zustand": "^5.0.0"
   },
+  "peerDependenciesMeta": {
+    "immer": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/node": "^20.19.11",
     "immer": "^10.1.1",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4",
+    "vitest": "^4.1.9",
     "zustand": "^5.0.8"
   }
 }
