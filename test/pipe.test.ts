@@ -7,6 +7,7 @@ import {
   type DevtoolsMutator,
   type ImmerMutator,
   type PersistMutator,
+  type Pipe,
   type PipeMiddleware,
   type SubscribeWithSelectorMutator,
 } from '../src/index.js'
@@ -73,6 +74,7 @@ describe('pipe', () => {
     expect('create' in pipe).toBe(false)
     expect('pipeStore' in publicApi).toBe(false)
     expect('pipeStateCreator' in publicApi).toBe(false)
+    expectTypeOf(pipe).toEqualTypeOf<Pipe>()
   })
 
   it('starts a typed builder from pipe.use', () => {
