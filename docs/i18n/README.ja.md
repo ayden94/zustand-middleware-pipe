@@ -123,6 +123,8 @@ immer()
 persist<T, PersistedState = T, PersistReturn = unknown>(options)
 subscribeWithSelector()
 devtools(options?)
+combine(initialState, creator)
+redux(reducer, initialState)
 ```
 
 `pipe.use(...)` が primary API です。middleware list が唯一の source of truth になるため、base creator は builder chain から計算された `set` 型を受け取ります。`immer()` を使うと `.create(...)` の中で draft mutation が使え、`devtools(...)` を使うと action name 引数が使え、`subscribeWithSelector()` を使うと最終 store に selector subscribe overload が反映されます。
@@ -132,13 +134,15 @@ Immer 以外の wrapper は middleware barrel から import し、Immer は専�
 ```ts
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
 import {
+  combine,
   devtools,
   persist,
+  redux,
   subscribeWithSelector,
 } from 'zustand-middleware-pipe/middleware'
 ```
 
-root entry point は middleware wrapper を import しません。middleware barrel も `immer` を import しないため、`persist`, `subscribeWithSelector`, `devtools` だけを使う consumer は optional Immer peer に触れません。wrapper 名は Zustand の元の middleware 名に意図的に合わせており、package subpath が pipe-aware 版であることを区別します。
+root entry point は middleware wrapper を import しません。middleware barrel も `immer` を import しないため、`persist`, `subscribeWithSelector`, `devtools`, `combine`, `redux` を使う non-Immer consumer は optional Immer peer に触れません。wrapper 名は Zustand の元の middleware 名に意図的に合わせており、package subpath が pipe-aware wrapper であることを明確にします。
 
 ```ts
 const store = createStore<CounterState>()(
@@ -153,6 +157,29 @@ const store = createStore<CounterState>()(
       inc: () =>
         set((state) => ({ count: state.count + 1 }), false, 'counter/inc'),
     })),
+)
+```
+
+`combine(...)` と `redux(...)` は公式 Zustand の state creator helper なので、`.use(...)` ではなく `.create(...)` の中に置きます。
+
+```ts
+type CounterAction = { type: 'inc' }
+type Dispatch = (action: CounterAction) => CounterAction
+
+const combinedStore = createStore<CounterState>()(
+  pipe
+    .use(devtools({ name: 'CombinedCounterStore' }))
+    .create(
+      combine({ count: 0 }, (set) => ({
+        inc: () => set((state) => ({ count: state.count + 1 })),
+      })),
+    ),
+)
+
+const reduxStore = createStore<CounterState & { dispatch: Dispatch }>()(
+  pipe
+    .use(devtools({ name: 'ReduxCounterStore' }))
+    .create(redux(reducer, { count: 0 })),
 )
 ```
 

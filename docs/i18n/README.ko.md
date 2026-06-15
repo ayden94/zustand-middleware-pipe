@@ -122,6 +122,8 @@ immer()
 persist<T, PersistedState = T, PersistReturn = unknown>(options)
 subscribeWithSelector()
 devtools(options?)
+combine(initialState, creator)
+redux(reducer, initialState)
 ```
 
 `pipe.use(...)`가 primary API입니다. middleware list가 유일한 source of truth가 되므로, base creator는 builder chain에서 계산된 `set` 타입을 받습니다. `immer()`를 사용하면 `.create(...)` 안에서 draft mutation이 가능하고, `devtools(...)`를 사용하면 action name 인자가 열리며, `subscribeWithSelector()`를 사용하면 최종 store에 selector subscribe overload가 반영됩니다.
@@ -131,13 +133,15 @@ Immer를 제외한 wrapper는 middleware barrel에서 import하고, Immer는 전
 ```ts
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
 import {
+  combine,
   devtools,
   persist,
+  redux,
   subscribeWithSelector,
 } from 'zustand-middleware-pipe/middleware'
 ```
 
-root entry point는 middleware wrapper를 import하지 않습니다. middleware barrel도 `immer`를 import하지 않으므로, `persist`, `subscribeWithSelector`, `devtools`만 쓰는 소비자는 optional Immer peer를 건드리지 않습니다. wrapper 이름은 Zustand의 원본 middleware 이름을 의도적으로 따르며, package subpath가 pipe-aware 버전을 구분합니다.
+root entry point는 middleware wrapper를 import하지 않습니다. middleware barrel도 `immer`를 import하지 않으므로, `persist`, `subscribeWithSelector`, `devtools`, `combine`, `redux`를 쓰는 non-Immer 소비자는 optional Immer peer를 건드리지 않습니다. wrapper 이름은 Zustand의 원본 middleware 이름을 의도적으로 따르며, package subpath가 pipe-aware wrapper임을 명확히 합니다.
 
 ```ts
 const store = createStore<CounterState>()(
@@ -152,6 +156,29 @@ const store = createStore<CounterState>()(
       inc: () =>
         set((state) => ({ count: state.count + 1 }), false, 'counter/inc'),
     })),
+)
+```
+
+`combine(...)`과 `redux(...)`는 공식 Zustand state creator helper이므로 `.use(...)`가 아니라 `.create(...)` 안에 둡니다.
+
+```ts
+type CounterAction = { type: 'inc' }
+type Dispatch = (action: CounterAction) => CounterAction
+
+const combinedStore = createStore<CounterState>()(
+  pipe
+    .use(devtools({ name: 'CombinedCounterStore' }))
+    .create(
+      combine({ count: 0 }, (set) => ({
+        inc: () => set((state) => ({ count: state.count + 1 })),
+      })),
+    ),
+)
+
+const reduxStore = createStore<CounterState & { dispatch: Dispatch }>()(
+  pipe
+    .use(devtools({ name: 'ReduxCounterStore' }))
+    .create(redux(reducer, { count: 0 })),
 )
 ```
 

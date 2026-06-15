@@ -176,7 +176,7 @@ type Dispatch = (action: CounterAction) => CounterAction
 const combinedStore = createStore<CounterState>()(
   pipe
     .use(devtools({ name: 'CombinedCounterStore' }))
-    .create<CounterState>(
+    .create(
       combine({ count: 0 }, (set) => ({
         inc: () => set((state) => ({ count: state.count + 1 })),
       })),
