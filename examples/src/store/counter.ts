@@ -1,12 +1,11 @@
 import { create } from 'zustand'
+import { pipe } from 'zustand-middleware-pipe'
 import {
-  definePipeStateCreator,
-  pipe,
-  withDevtools,
-  withImmer,
-  withPersist,
-  withSubscribeWithSelector,
-} from 'zustand-middleware-pipe'
+  devtools,
+  persist,
+  subscribeWithSelector,
+} from 'zustand-middleware-pipe/middleware'
+import { immer } from 'zustand-middleware-pipe/middleware/immer'
 import { createJSONStorage } from 'zustand/middleware'
 
 export interface CounterState {
@@ -25,47 +24,41 @@ const initialState = {
   label: 'middleware pipe demo',
 } satisfies PersistedCounterState
 
-const baseCreator = definePipeStateCreator<
-  CounterState,
-  'immer' | 'persist' | 'subscribeWithSelector' | 'devtools'
->((set) => ({
-  ...initialState,
-  decrement: () => {
-    set(
-      (state) => {
-        state.count -= 1
-      },
-      false,
-      'counter/decrement',
-    )
-  },
-  increment: () => {
-    set(
-      (state) => {
-        state.count += 1
-      },
-      false,
-      'counter/increment',
-    )
-  },
-  reset: () => {
-    set(initialState, false, 'counter/reset')
-  },
-  setLabel: (label) => {
-    set({ label }, false, 'counter/setLabel')
-  },
-}))
-
 export const useCounterStore = create<CounterState>()(
-  pipe(
-    baseCreator,
-    withImmer(),
-    withPersist<CounterState, PersistedCounterState>({
+  pipe<CounterState>()
+    .use(immer())
+    .use(persist<CounterState, PersistedCounterState>({
       name: 'zustand-middleware-pipe-demo',
       storage: createJSONStorage<PersistedCounterState>(() => localStorage),
       partialize: (state) => ({ count: state.count, label: state.label }),
-    }),
-    withSubscribeWithSelector(),
-    withDevtools({ name: 'ZustandMiddlewarePipeDemo' }),
-  ),
+    }))
+    .use(subscribeWithSelector())
+    .use(devtools({ name: 'ZustandMiddlewarePipeDemo' }))
+    .create((set) => ({
+      ...initialState,
+      decrement: () => {
+        set(
+          (state) => {
+            state.count -= 1
+          },
+          false,
+          'counter/decrement',
+        )
+      },
+      increment: () => {
+        set(
+          (state) => {
+            state.count += 1
+          },
+          false,
+          'counter/increment',
+        )
+      },
+      reset: () => {
+        set(initialState, false, 'counter/reset')
+      },
+      setLabel: (label) => {
+        set({ label }, false, 'counter/setLabel')
+      },
+    })),
 )

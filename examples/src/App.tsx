@@ -23,8 +23,8 @@ function App() {
   return (
     <main className="app-shell">
       <section className="hero-card" aria-labelledby="demo-title">
-        <p className="eyebrow">Vite + React + Zustand</p>
-        <h1 id="demo-title">zustand-middleware-pipe@0.0.3 테스트</h1>
+        <p className="eyebrow">zustand-middleware-pipe</p>
+        <h1 id="demo-title">pipe() 미들웨어 테스트</h1>
         <p className="description">
           <code>pipe()</code>로 Zustand middleware를 왼쪽에서 오른쪽 순서로
           조합했습니다. 카운터 값과 라벨은 <code>persist</code>로 localStorage에
@@ -61,19 +61,19 @@ function App() {
 
         <dl className="checks">
           <div>
-            <dt>withImmer()</dt>
+            <dt>.use(immer())</dt>
             <dd>action 내부에서 draft mutation으로 count를 변경합니다.</dd>
           </div>
           <div>
-            <dt>withPersist()</dt>
+            <dt>.use(persist())</dt>
             <dd>새로고침 후에도 count와 label이 유지됩니다.</dd>
           </div>
           <div>
-            <dt>withSubscribeWithSelector()</dt>
+            <dt>.use(subscribeWithSelector())</dt>
             <dd>selector subscribe 결과: {lastChange}</dd>
           </div>
           <div>
-            <dt>withDevtools()</dt>
+            <dt>.use(devtools())</dt>
             <dd>Redux DevTools가 있으면 action 이름이 표시됩니다.</dd>
           </div>
         </dl>
