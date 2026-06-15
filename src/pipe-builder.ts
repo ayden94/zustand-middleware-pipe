@@ -98,10 +98,10 @@ function createPipeBuilder<
         middleware,
       )
     },
-    create(
-      initializer: StateCreator<T, Required, [], T>,
-    ): StateCreator<T, [], StoreMutators, T> {
-      return apply<[], []>(initializer)
+    create<Mcs extends MutatorTuple = []>(
+      initializer: StateCreator<T, Required, Mcs, T>,
+    ): StateCreator<T, [], [...StoreMutators, ...Mcs], T> {
+      return apply<[], Mcs>(initializer)
     },
   }
 }

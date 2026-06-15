@@ -4,6 +4,7 @@ import { createStore } from 'zustand/vanilla'
 import * as publicApi from '../src/index.js'
 import {
   pipe,
+  pipeFor,
   type DevtoolsMutator,
   type ImmerMutator,
   type PersistMutator,
@@ -14,8 +15,10 @@ import type { PipeCanUseMiddleware } from '../src/types.js'
 import * as middleware from '../src/middleware.js'
 import { immer } from '../src/middleware/immer.js'
 import {
+  combine,
   devtools,
   persist,
+  redux,
   subscribeWithSelector,
 } from '../src/middleware.js'
 
@@ -27,6 +30,11 @@ interface CounterState {
 }
 
 type PersistedCounterState = Pick<CounterState, 'count'>
+
+type CounterAction = { type: 'inc' }
+type ReduxCounterStore = Pick<CounterState, 'count'> & {
+  dispatch: (action: CounterAction) => CounterAction
+}
 
 function createMemoryStorage(): StateStorage {
   const values = new Map<string, string>()
@@ -58,6 +66,7 @@ describe('pipe', () => {
   it('exports the intended root runtime helpers', () => {
     expect(Object.keys(publicApi).sort()).toEqual([
       'pipe',
+      'pipeFor',
     ])
     expect(Object.keys(pipe).sort()).toEqual([
       'use',
@@ -66,6 +75,13 @@ describe('pipe', () => {
     expect('create' in pipe).toBe(false)
     expect('pipeStore' in publicApi).toBe(false)
     expect('pipeStateCreator' in publicApi).toBe(false)
+  })
+
+  it('creates typed pipe builders with pipeFor', () => {
+    const builder = pipeFor<CounterState>()
+
+    expect(typeof builder.use).toBe('function')
+    expect(typeof builder.create).toBe('function')
   })
 
   it('starts a typed builder from pipe.use', () => {
@@ -86,7 +102,9 @@ describe('pipe', () => {
 
   it('exports non-Immer wrappers from the middleware barrel', () => {
     expect('immer' in middleware).toBe(false)
+    expect(typeof middleware.combine).toBe('function')
     expect(typeof middleware.persist).toBe('function')
+    expect(typeof middleware.redux).toBe('function')
     expect(typeof middleware.subscribeWithSelector).toBe('function')
     expect(typeof middleware.devtools).toBe('function')
   })
@@ -148,6 +166,55 @@ describe('pipe', () => {
     expect(store.persist.hasHydrated()).toBe(true)
 
     unsubscribe()
+  })
+
+  it('supports official combine as a terminal state creator helper', () => {
+    const store = createStore<CounterState>()(
+      pipeFor<CounterState>()
+        .use(devtools({ name: 'CombinedCounterStore', enabled: false }))
+        .create(
+          combine({ count: 0, label: 'counter' }, (set) => ({
+            inc: () => {
+              set((state) => ({ count: state.count + 1 }))
+            },
+            setLabel: (label: string) => {
+              set({ label })
+            },
+          })),
+        ),
+    )
+
+    store.getState().inc()
+
+    expect(store.getState().count).toBe(1)
+    expectTypeOf<typeof store.devtools.cleanup>().toEqualTypeOf<() => void>()
+  })
+
+  it('supports official redux as a terminal state creator helper', () => {
+    const reducer = (
+      state: Pick<CounterState, 'count'>,
+      action: CounterAction,
+    ) => {
+      if (action.type === 'inc') {
+        return { count: state.count + 1 }
+      }
+
+      return state
+    }
+
+    const store = createStore<ReduxCounterStore>()(
+      pipeFor<ReduxCounterStore>()
+        .use(devtools({ name: 'ReduxCounterStore', enabled: false }))
+        .create(redux(reducer, { count: 0 })),
+    )
+
+    store.dispatch({ type: 'inc' })
+
+    expect(store.getState().count).toBe(1)
+    expectTypeOf(store.dispatch).toEqualTypeOf<
+      (action: CounterAction) => CounterAction
+    >()
+    expectTypeOf<typeof store.devtools.cleanup>().toEqualTypeOf<() => void>()
   })
 
   it('preserves use order with later middleware wrapping earlier middleware', () => {

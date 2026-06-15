@@ -120,6 +120,8 @@ This package is ESM-only.
 ## API
 
 ```ts
+pipeFor<T>()
+
 pipe.use(immer())
   .use(persist<T, PersistedState>(options))
   .use(subscribeWithSelector())
@@ -130,6 +132,8 @@ immer()
 persist<T, PersistedState = T, PersistReturn = unknown>(options)
 subscribeWithSelector()
 devtools(options?)
+combine(initialState, creator)
+redux(reducer, initialState)
 ```
 
 `pipe.use(...)` is the primary API. It keeps the middleware list as the only source of truth, so the base creator receives the right `set` type from the builder chain. If you use `immer()`, draft mutation is available in `.create(...)`; if you use `devtools(...)`, action names are accepted; if you use `subscribeWithSelector()`, the final store gets the selector subscribe overload.
@@ -139,13 +143,15 @@ Import non-Immer wrappers from the middleware barrel, and import Immer from its 
 ```ts
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
 import {
+  combine,
   devtools,
   persist,
+  redux,
   subscribeWithSelector,
 } from 'zustand-middleware-pipe/middleware'
 ```
 
-The root entry point does not import any middleware wrappers. The middleware barrel also avoids importing `immer`, so non-Immer consumers can use `persist`, `subscribeWithSelector`, and `devtools` without touching the optional Immer peer. The wrapper names intentionally mirror Zustand's middleware names; the package subpath is what makes them the pipe-aware versions.
+The root entry point does not import any middleware wrappers. The middleware barrel also avoids importing `immer`, so non-Immer consumers can use `persist`, `subscribeWithSelector`, `devtools`, `combine`, and `redux` without touching the optional Immer peer. The wrapper names intentionally mirror Zustand's middleware names; the package subpath is what makes the pipe-aware wrappers explicit.
 
 ```ts
 const store = createStore<CounterState>()(
@@ -160,6 +166,29 @@ const store = createStore<CounterState>()(
       inc: () =>
         set((state) => ({ count: state.count + 1 }), false, 'counter/inc'),
     })),
+)
+```
+
+`combine(...)` and `redux(...)` are official Zustand state creator helpers, so they belong in `.create(...)` rather than `.use(...)`:
+
+```ts
+type CounterAction = { type: 'inc' }
+type Dispatch = (action: CounterAction) => CounterAction
+
+const combinedStore = createStore<CounterState>()(
+  pipeFor<CounterState>()
+    .use(devtools({ name: 'CombinedCounterStore' }))
+    .create(
+      combine({ count: 0 }, (set) => ({
+        inc: () => set((state) => ({ count: state.count + 1 })),
+      })),
+    ),
+)
+
+const reduxStore = createStore<CounterState & { dispatch: Dispatch }>()(
+  pipeFor<CounterState & { dispatch: Dispatch }>()
+    .use(devtools({ name: 'ReduxCounterStore' }))
+    .create(redux(reducer, { count: 0 })),
 )
 ```
 

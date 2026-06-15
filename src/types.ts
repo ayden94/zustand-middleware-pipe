@@ -169,7 +169,7 @@ export interface PipeBuilder<
     [...Consumed, ...Required],
     [...Produced, ...StoreMutators]
   >
-  create(
-    initializer: StateCreator<T, Required, [], T>,
-  ): StateCreator<T, [], StoreMutators, T>
+  create<Mcs extends MutatorTuple = []>(
+    initializer: StateCreator<T, Required, Mcs, T>,
+  ): StateCreator<T, [], [...StoreMutators, ...Mcs], T>
 }

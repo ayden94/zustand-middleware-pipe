@@ -10,3 +10,7 @@ const initialPipeBuilder = createInitialPipeBuilder<unknown>()
 export const pipe: Pipe = {
   use: initialPipeBuilder.use,
 }
+
+export function pipeFor<T>(): PipeBuilder<T> {
+  return createInitialPipeBuilder<T>()
+}
