@@ -62,7 +62,7 @@ grows. The runtime order is hidden in the nesting.
 This helper lets the same runtime order be written left-to-right:
 
 ```ts
-import { pipe } from 'zustand-middleware-pipe'
+import { pipe, pipeFor } from 'zustand-middleware-pipe'
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
 import {
   devtools,
