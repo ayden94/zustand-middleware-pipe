@@ -12,6 +12,12 @@
   box-shadow: var(--shadow);
 }
 
+.example-grid {
+  display: grid;
+  gap: 24px;
+  margin-top: 24px;
+}
+
 .hero-card {
   padding: 48px;
   text-align: left;
@@ -35,8 +41,28 @@
 .counter-card {
   display: grid;
   gap: 28px;
-  margin-top: 24px;
   padding: 32px;
+}
+
+.card-heading {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.card-heading h2,
+.card-heading p {
+  margin: 0;
+}
+
+.card-heading h2 {
+  color: var(--text-h);
+  font-size: clamp(24px, 4vw, 36px);
+}
+
+.card-heading p {
+  max-width: 720px;
+  color: var(--text);
 }
 
 .field {
@@ -85,6 +111,14 @@ button:focus-visible {
   color: var(--text-h);
   font-size: clamp(64px, 16vw, 120px);
   line-height: 1;
+}
+
+.count-panel.compact {
+  min-height: 120px;
+}
+
+.count-panel.compact strong {
+  font-size: clamp(48px, 10vw, 84px);
 }
 
 .button-row {

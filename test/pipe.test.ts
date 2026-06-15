@@ -4,7 +4,6 @@ import { createStore } from 'zustand/vanilla'
 import * as publicApi from '../src/index.js'
 import {
   pipe,
-  pipeFor,
   type DevtoolsMutator,
   type ImmerMutator,
   type PersistMutator,
@@ -66,7 +65,6 @@ describe('pipe', () => {
   it('exports the intended root runtime helpers', () => {
     expect(Object.keys(publicApi).sort()).toEqual([
       'pipe',
-      'pipeFor',
     ])
     expect(Object.keys(pipe).sort()).toEqual([
       'use',
@@ -75,13 +73,6 @@ describe('pipe', () => {
     expect('create' in pipe).toBe(false)
     expect('pipeStore' in publicApi).toBe(false)
     expect('pipeStateCreator' in publicApi).toBe(false)
-  })
-
-  it('creates typed pipe builders with pipeFor', () => {
-    const builder = pipeFor<CounterState>()
-
-    expect(typeof builder.use).toBe('function')
-    expect(typeof builder.create).toBe('function')
   })
 
   it('starts a typed builder from pipe.use', () => {
@@ -169,10 +160,10 @@ describe('pipe', () => {
   })
 
   it('supports official combine as a terminal state creator helper', () => {
-    const store = createStore<CounterState>()(
-      pipeFor<CounterState>()
+    const store = createStore(
+      pipe
         .use(devtools({ name: 'CombinedCounterStore', enabled: false }))
-        .create(
+        .create<CounterState>(
           combine({ count: 0, label: 'counter' }, (set) => ({
             inc: () => {
               set((state) => ({ count: state.count + 1 }))
@@ -203,7 +194,7 @@ describe('pipe', () => {
     }
 
     const store = createStore<ReduxCounterStore>()(
-      pipeFor<ReduxCounterStore>()
+      pipe
         .use(devtools({ name: 'ReduxCounterStore', enabled: false }))
         .create(redux(reducer, { count: 0 })),
     )

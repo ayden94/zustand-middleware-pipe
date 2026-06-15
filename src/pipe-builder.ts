@@ -8,6 +8,8 @@ import type {
   PipeCompatibleMiddleware,
   PipeMiddlewareOrderGuard,
   PipeMiddleware,
+  PipeResolvedState,
+  PipeStateCompatibility,
 } from './types.js'
 
 function extendPipeBuilder<
@@ -50,12 +52,7 @@ function extendPipeBuilder<
   Produced extends MutatorTuple,
 >(
   apply: PipeApply<T, Required, StoreMutators>,
-  middleware: PipeCompatibleMiddleware<
-    T,
-    StoreMutators,
-    Consumed,
-    Produced
-  > &
+  middleware: PipeCompatibleAnyMiddleware<StoreMutators, Consumed, Produced> &
     PipeMiddlewareOrderGuard<StoreMutators, Produced>,
 ): PipeBuilder<
   T,
@@ -63,15 +60,21 @@ function extendPipeBuilder<
   [...Produced, ...StoreMutators]
 > {
   return createPipeBuilder(
-    <Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
+    <
+      NextT = T,
+      Mps extends MutatorTuple = [],
+      Mcs extends MutatorTuple = [],
+    >(
       initializer: StateCreator<
-        T,
+        NextT,
         [...Mps, ...Consumed, ...Required],
-        Mcs
-      >,
+        Mcs,
+        NextT
+      > &
+        PipeStateCompatibility<T, NextT>,
     ) =>
       middleware(
-        apply<[...Mps, ...Consumed], Mcs>(initializer),
+        apply<NextT, [...Mps, ...Consumed], Mcs>(initializer),
       ),
   )
 }
@@ -98,18 +101,29 @@ function createPipeBuilder<
         middleware,
       )
     },
-    create<Mcs extends MutatorTuple = []>(
-      initializer: StateCreator<T, Required, Mcs, T>,
-    ): StateCreator<T, [], [...StoreMutators, ...Mcs], T> {
-      return apply<[], Mcs>(initializer)
+    create<NextT = T, Mcs extends MutatorTuple = []>(
+      initializer: StateCreator<NextT, Required, Mcs, NextT> &
+        PipeStateCompatibility<T, NextT>,
+    ): StateCreator<
+      PipeResolvedState<T, NextT>,
+      [],
+      [...StoreMutators, ...Mcs],
+      PipeResolvedState<T, NextT>
+    > {
+      return apply<NextT, [], Mcs>(initializer)
     },
   }
 }
 
-export function createInitialPipeBuilder<T>(): PipeBuilder<T> {
-  return createPipeBuilder<T, [], []>(
-    <Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
-      initializer: StateCreator<T, [...Mps], Mcs>,
-    ): StateCreator<T, Mps, [...Mcs]> => initializer,
+export function createInitialPipeBuilder(): PipeBuilder<unknown> {
+  return createPipeBuilder<unknown, [], []>(
+    <
+      NextT = unknown,
+      Mps extends MutatorTuple = [],
+      Mcs extends MutatorTuple = [],
+    >(
+      initializer: StateCreator<NextT, [...Mps], Mcs, NextT> &
+        PipeStateCompatibility<unknown, NextT>,
+    ): StateCreator<NextT, Mps, [...Mcs], NextT> => initializer,
   )
 }

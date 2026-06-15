@@ -127,15 +127,25 @@ export type PipeApply<
   T,
   Required extends MutatorTuple,
   StoreMutators extends MutatorTuple,
-> = <Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
-  initializer: StateCreator<T, [...Mps, ...Required], Mcs>,
-) => StateCreator<T, Mps, [...StoreMutators, ...Mcs]>
+> = <
+  NextT = T,
+  Mps extends MutatorTuple = [],
+  Mcs extends MutatorTuple = [],
+>(
+  initializer: StateCreator<NextT, [...Mps, ...Required], Mcs, NextT> &
+    PipeStateCompatibility<T, NextT>,
+) => StateCreator<
+  PipeResolvedState<T, NextT>,
+  Mps,
+  [...StoreMutators, ...Mcs],
+  PipeResolvedState<T, NextT>
+>
 
-type PipeResolvedState<Current, Next> = unknown extends Current
+export type PipeResolvedState<Current, Next> = unknown extends Current
   ? Next
   : Current
 
-type PipeStateCompatibility<Current, Next> = unknown extends Current
+export type PipeStateCompatibility<Current, Next> = unknown extends Current
   ? unknown
   : [Next] extends [Current]
     ? unknown
@@ -169,7 +179,13 @@ export interface PipeBuilder<
     [...Consumed, ...Required],
     [...Produced, ...StoreMutators]
   >
-  create<Mcs extends MutatorTuple = []>(
-    initializer: StateCreator<T, Required, Mcs, T>,
-  ): StateCreator<T, [], [...StoreMutators, ...Mcs], T>
+  create<NextT = T, Mcs extends MutatorTuple = []>(
+    initializer: StateCreator<NextT, Required, Mcs, NextT> &
+      PipeStateCompatibility<T, NextT>,
+  ): StateCreator<
+    PipeResolvedState<T, NextT>,
+    [],
+    [...StoreMutators, ...Mcs],
+    PipeResolvedState<T, NextT>
+  >
 }

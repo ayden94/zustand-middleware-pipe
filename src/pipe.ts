@@ -5,12 +5,8 @@ export interface Pipe {
   readonly use: PipeBuilder<unknown>['use']
 }
 
-const initialPipeBuilder = createInitialPipeBuilder<unknown>()
+const initialPipeBuilder = createInitialPipeBuilder()
 
 export const pipe: Pipe = {
   use: initialPipeBuilder.use,
-}
-
-export function pipeFor<T>(): PipeBuilder<T> {
-  return createInitialPipeBuilder<T>()
 }

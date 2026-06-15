@@ -62,7 +62,7 @@ grows. The runtime order is hidden in the nesting.
 This helper lets the same runtime order be written left-to-right:
 
 ```ts
-import { pipe, pipeFor } from 'zustand-middleware-pipe'
+import { pipe } from 'zustand-middleware-pipe'
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
 import {
   devtools,
@@ -120,8 +120,6 @@ This package is ESM-only.
 ## API
 
 ```ts
-pipeFor<T>()
-
 pipe.use(immer())
   .use(persist<T, PersistedState>(options))
   .use(subscribeWithSelector())
@@ -176,9 +174,9 @@ type CounterAction = { type: 'inc' }
 type Dispatch = (action: CounterAction) => CounterAction
 
 const combinedStore = createStore<CounterState>()(
-  pipeFor<CounterState>()
+  pipe
     .use(devtools({ name: 'CombinedCounterStore' }))
-    .create(
+    .create<CounterState>(
       combine({ count: 0 }, (set) => ({
         inc: () => set((state) => ({ count: state.count + 1 })),
       })),
@@ -186,7 +184,7 @@ const combinedStore = createStore<CounterState>()(
 )
 
 const reduxStore = createStore<CounterState & { dispatch: Dispatch }>()(
-  pipeFor<CounterState & { dispatch: Dispatch }>()
+  pipe
     .use(devtools({ name: 'ReduxCounterStore' }))
     .create(redux(reducer, { count: 0 })),
 )

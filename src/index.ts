@@ -1,4 +1,4 @@
-export { pipe, pipeFor } from './pipe.js'
+export { pipe } from './pipe.js'
 export type {
   DevtoolsMutator,
   ImmerMutator,
