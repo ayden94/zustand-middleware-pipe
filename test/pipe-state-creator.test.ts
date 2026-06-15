@@ -1,16 +1,27 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createJSONStorage, type StateStorage } from 'zustand/middleware'
 import { createStore, type StateCreator } from 'zustand/vanilla'
+import * as publicApi from '../src/index.js'
 import {
   definePipeStateCreator,
   pipe,
   pipeStateCreator,
-  withDevtools,
-  withImmer,
-  withPersist,
-  withSubscribeWithSelector,
+  type DevtoolsMutator,
+  type ImmerMutator,
+  type PersistMutator,
+  type PipeBuilder,
   type PipeMiddlewareStack,
+  type PipeCanUseMiddleware,
+  type PipeAnyMiddleware,
+  type SubscribeWithSelectorMutator,
 } from '../src/index.js'
+import * as middleware from '../src/middleware.js'
+import { immer } from '../src/middleware/immer.js'
+import {
+  devtools,
+  persist,
+  subscribeWithSelector,
+} from '../src/middleware.js'
 
 interface CounterState {
   count: number
@@ -35,6 +46,18 @@ function createMemoryStorage(): StateStorage {
   }
 }
 
+function createOrderMarkerMiddleware(
+  name: string,
+  events: string[],
+): PipeAnyMiddleware<[], []> {
+  return (initializer) => (set, get, store) => {
+    events.push(`${name}:before`)
+    const state = initializer(set, get, store)
+    events.push(`${name}:after`)
+    return state
+  }
+}
+
 describe('pipe', () => {
   it('composes ordinary wrappers from left to right', () => {
     const result = pipe(
@@ -51,52 +74,63 @@ describe('pipe', () => {
     expect(pipeStateCreator).toBe(pipe)
   })
 
-  it('composes Zustand middleware wrappers while preserving store extensions', () => {
-    const baseCreator = definePipeStateCreator<
-      CounterState,
-      'immer' | 'persist' | 'subscribeWithSelector' | 'devtools'
-    >((set) => ({
-      count: 0,
-      label: 'counter',
-      inc: () => {
-        set(
-          (state) => {
-            state.count += 1
-          },
-          false,
-          'counter/inc',
-        )
-      },
-      setLabel: (label) => {
-        set({ label }, false, 'counter/setLabel')
-      },
-    }))
+  it('exports the intended root runtime helpers', () => {
+    expect(Object.keys(publicApi).sort()).toEqual([
+      'definePipeStateCreator',
+      'pipe',
+      'pipeStateCreator',
+    ])
+    expect('pipeStore' in publicApi).toBe(false)
+  })
 
-    expectTypeOf(baseCreator).toEqualTypeOf<
-      StateCreator<
-        CounterState,
-        PipeMiddlewareStack<
-          'immer' | 'persist' | 'subscribeWithSelector' | 'devtools'
-        >,
-        [],
-        CounterState
-      >
-    >()
+  it('creates a typed builder when called without a base value', () => {
+    const builder = pipe<CounterState>()
 
+    expectTypeOf(builder).toEqualTypeOf<PipeBuilder<CounterState>>()
+    expect(typeof builder.use).toBe('function')
+    expect(typeof builder.create).toBe('function')
+  })
+
+  it('exports non-Immer wrappers from the middleware barrel', () => {
+    expect('immer' in middleware).toBe(false)
+    expect(typeof middleware.persist).toBe('function')
+    expect(typeof middleware.subscribeWithSelector).toBe('function')
+    expect(typeof middleware.devtools).toBe('function')
+  })
+
+  it('exports Immer from the dedicated middleware subpath', () => {
+    expect(typeof immer).toBe('function')
+  })
+
+  it('builds a Zustand middleware stack while preserving store extensions', () => {
     const store = createStore<CounterState>()(
-      pipe(
-        baseCreator,
-        withImmer(),
-        withPersist<CounterState, PersistedCounterState>({
+      pipe<CounterState>()
+        .use(immer())
+        .use(persist<CounterState, PersistedCounterState>({
           name: 'counter',
           storage: createJSONStorage<PersistedCounterState>(() =>
             createMemoryStorage(),
           ),
           partialize: (state) => ({ count: state.count }),
-        }),
-        withSubscribeWithSelector(),
-        withDevtools({ name: 'CounterStore', enabled: false }),
-      ),
+        }))
+        .use(subscribeWithSelector())
+        .use(devtools({ name: 'CounterStore', enabled: false }))
+        .create((set) => ({
+          count: 0,
+          label: 'counter',
+          inc: () => {
+            set(
+              (state) => {
+                state.count += 1
+              },
+              false,
+              'counter/inc',
+            )
+          },
+          setLabel: (label) => {
+            set({ label }, false, 'counter/setLabel')
+          },
+        })),
     )
 
     expectTypeOf(store.persist.hasHydrated()).toEqualTypeOf<boolean>()
@@ -121,6 +155,37 @@ describe('pipe', () => {
     expect(store.persist.hasHydrated()).toBe(true)
 
     unsubscribe()
+  })
+
+  it('preserves use order with later middleware wrapping earlier middleware', () => {
+    const events: string[] = []
+
+    const store = createStore<{ count: number }>()(
+      pipe<{ count: number }>()
+        .use(createOrderMarkerMiddleware('inner', events))
+        .use(createOrderMarkerMiddleware('outer', events))
+        .create(() => ({ count: 0 })),
+    )
+
+    expect(store.getState().count).toBe(0)
+    expect(events).toEqual([
+      'outer:before',
+      'inner:before',
+      'inner:after',
+      'outer:after',
+    ])
+  })
+
+  it('models the recommended built-in middleware order at the type level', () => {
+    expectTypeOf<
+      PipeCanUseMiddleware<
+        [DevtoolsMutator, SubscribeWithSelectorMutator, PersistMutator],
+        [ImmerMutator]
+      >
+    >().toEqualTypeOf<false>()
+    expectTypeOf<
+      PipeCanUseMiddleware<[PersistMutator], [DevtoolsMutator]>
+    >().toEqualTypeOf<true>()
   })
 
   it('allows pipe creators without immer when the stack omits immer', () => {
@@ -154,15 +219,15 @@ describe('pipe', () => {
     const store = createStore<CounterState>()(
       pipe(
         baseCreator,
-        withPersist<CounterState, PersistedCounterState>({
+        persist<CounterState, PersistedCounterState>({
           name: 'counter-without-immer',
           storage: createJSONStorage<PersistedCounterState>(() =>
             createMemoryStorage(),
           ),
           partialize: (state) => ({ count: state.count }),
         }),
-        withSubscribeWithSelector(),
-        withDevtools({ name: 'CounterStoreWithoutImmer', enabled: false }),
+        subscribeWithSelector(),
+        devtools({ name: 'CounterStoreWithoutImmer', enabled: false }),
       ),
     )
 

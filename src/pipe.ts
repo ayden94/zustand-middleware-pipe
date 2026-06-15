@@ -1,5 +1,10 @@
-import type { StateCreatorPipeStep } from './types.js'
+import { createInitialPipeBuilder } from './pipe-builder.js'
+import type {
+  PipeBuilder,
+  StateCreatorPipeStep,
+} from './types.js'
 
+export function pipe<T>(): PipeBuilder<T>
 export function pipe<A>(base: A): A
 export function pipe<A, B>(
   base: A,
@@ -51,9 +56,13 @@ export function pipe<A, B, C, D, E, F, G, H>(
   gh: StateCreatorPipeStep<G, H>,
 ): H
 export function pipe(
-  base: unknown,
+  base?: unknown,
   ...wrappers: ReadonlyArray<(value: unknown) => unknown>
 ): unknown {
+  if (arguments.length === 0) {
+    return createInitialPipeBuilder<unknown>()
+  }
+
   return wrappers.reduce((current, wrapper) => wrapper(current), base)
 }
 

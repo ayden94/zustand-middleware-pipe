@@ -1,16 +1,87 @@
-import type { StoreMutatorIdentifier } from 'zustand/vanilla'
-
-type PipeMiddlewareTypeSources =
-  | typeof import('zustand/middleware').devtools
-  | typeof import('zustand/middleware').persist
-  | typeof import('zustand/middleware').subscribeWithSelector
-  | typeof import('zustand/middleware/immer').immer
-
-type PipeMiddlewareTypesLoaded = PipeMiddlewareTypeSources extends never
-  ? never
-  : unknown
+import type { StateCreator, StoreMutatorIdentifier } from 'zustand/vanilla'
 
 export type MutatorTuple = [StoreMutatorIdentifier, unknown][]
+
+export type DevtoolsMutator = ['zustand/devtools', never]
+export type ImmerMutator = ['zustand/immer', never]
+export type PersistMutator<PersistedState = unknown> = [
+  'zustand/persist',
+  PersistedState,
+]
+export type SubscribeWithSelectorMutator = [
+  'zustand/subscribeWithSelector',
+  never,
+]
+
+type PipeBuiltInMutatorId =
+  | DevtoolsMutator[0]
+  | ImmerMutator[0]
+  | PersistMutator[0]
+  | SubscribeWithSelectorMutator[0]
+
+type PipeAllowedCurrentMutatorId<
+  Id extends PipeBuiltInMutatorId,
+> = Id extends DevtoolsMutator[0]
+  ? PipeBuiltInMutatorId
+  : Id extends SubscribeWithSelectorMutator[0]
+    ? Exclude<PipeBuiltInMutatorId, DevtoolsMutator[0]>
+    : Id extends PersistMutator[0]
+      ? PersistMutator[0] | ImmerMutator[0]
+      : ImmerMutator[0]
+
+type PipeCanWrapCurrentMutator<
+  Current extends [StoreMutatorIdentifier, unknown],
+  ProducedId extends PipeBuiltInMutatorId,
+> = Current[0] extends PipeBuiltInMutatorId
+  ? Current[0] extends PipeAllowedCurrentMutatorId<ProducedId>
+    ? true
+    : false
+  : true
+
+type PipeCanWrapCurrentStack<
+  CurrentStoreMutators extends MutatorTuple,
+  ProducedId extends PipeBuiltInMutatorId,
+> = CurrentStoreMutators extends [
+  infer Current extends [StoreMutatorIdentifier, unknown],
+  ...infer Rest extends MutatorTuple,
+]
+  ? PipeCanWrapCurrentMutator<Current, ProducedId> extends true
+    ? PipeCanWrapCurrentStack<Rest, ProducedId>
+    : false
+  : true
+
+type PipeCanUseProducedMutator<
+  CurrentStoreMutators extends MutatorTuple,
+  Produced extends [StoreMutatorIdentifier, unknown],
+> = Produced[0] extends PipeBuiltInMutatorId
+  ? PipeCanWrapCurrentStack<CurrentStoreMutators, Produced[0]>
+  : true
+
+export type PipeCanUseMiddleware<
+  CurrentStoreMutators extends MutatorTuple,
+  Produced extends MutatorTuple,
+> = Produced extends [
+  infer Current extends [StoreMutatorIdentifier, unknown],
+  ...infer Rest extends MutatorTuple,
+]
+  ? PipeCanUseProducedMutator<
+      CurrentStoreMutators,
+      Current
+    > extends true
+    ? PipeCanUseMiddleware<CurrentStoreMutators, Rest>
+    : false
+  : true
+
+export type PipeMiddlewareOrderGuard<
+  CurrentStoreMutators extends MutatorTuple,
+  Produced extends MutatorTuple,
+> = PipeCanUseMiddleware<CurrentStoreMutators, Produced> extends true
+  ? unknown
+  : {
+      readonly __pipeMiddlewareOrderError: 'Built-in pipe middleware must be added from inner to outer: immer, persist, subscribeWithSelector, devtools'
+      readonly __pipeCurrentMutators: CurrentStoreMutators
+      readonly __pipeProducedMutators: Produced
+    }
 
 export type PipeMiddlewareName =
   | 'devtools'
@@ -20,13 +91,13 @@ export type PipeMiddlewareName =
 
 type PipeMiddlewareMutator<Name extends PipeMiddlewareName> =
   Name extends 'devtools'
-    ? ['zustand/devtools', never]
+    ? DevtoolsMutator
     : Name extends 'subscribeWithSelector'
-      ? ['zustand/subscribeWithSelector', never]
+      ? SubscribeWithSelectorMutator
       : Name extends 'persist'
-        ? ['zustand/persist', unknown]
+        ? PersistMutator
         : Name extends 'immer'
-          ? ['zustand/immer', never]
+          ? ImmerMutator
           : never
 
 type IncludePipeMiddleware<
@@ -36,12 +107,87 @@ type IncludePipeMiddleware<
 
 export type PipeMiddlewareStack<
   Names extends PipeMiddlewareName = never,
-> = PipeMiddlewareTypesLoaded &
-  [
-    ...IncludePipeMiddleware<Names, 'devtools'>,
-    ...IncludePipeMiddleware<Names, 'subscribeWithSelector'>,
-    ...IncludePipeMiddleware<Names, 'persist'>,
-    ...IncludePipeMiddleware<Names, 'immer'>,
-  ]
+> = [
+  ...IncludePipeMiddleware<Names, 'devtools'>,
+  ...IncludePipeMiddleware<Names, 'subscribeWithSelector'>,
+  ...IncludePipeMiddleware<Names, 'persist'>,
+  ...IncludePipeMiddleware<Names, 'immer'>,
+]
 
 export type StateCreatorPipeStep<Input, Output> = (stateCreator: Input) => Output
+
+export type PipeMiddleware<
+  T,
+  Consumed extends MutatorTuple,
+  Produced extends MutatorTuple,
+> = <Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
+  initializer: StateCreator<T, [...Mps, ...Consumed], Mcs>,
+) => StateCreator<T, Mps, [...Produced, ...Mcs]>
+
+export type PipeAnyMiddleware<
+  Consumed extends MutatorTuple,
+  Produced extends MutatorTuple,
+> = <T, Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
+  initializer: StateCreator<T, [...Mps, ...Consumed], Mcs>,
+) => StateCreator<T, Mps, [...Produced, ...Mcs]>
+
+export type PipeCompatibleMiddleware<
+  T,
+  CurrentStoreMutators extends MutatorTuple,
+  Consumed extends MutatorTuple,
+  Produced extends MutatorTuple,
+> = <Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
+  initializer: StateCreator<
+    T,
+    [...Mps, ...Consumed],
+    [...CurrentStoreMutators, ...Mcs]
+  >,
+) => StateCreator<T, Mps, [...Produced, ...CurrentStoreMutators, ...Mcs]>
+
+export type PipeCompatibleAnyMiddleware<
+  CurrentStoreMutators extends MutatorTuple,
+  Consumed extends MutatorTuple,
+  Produced extends MutatorTuple,
+> = <T, Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
+  initializer: StateCreator<
+    T,
+    [...Mps, ...Consumed],
+    [...CurrentStoreMutators, ...Mcs]
+  >,
+) => StateCreator<T, Mps, [...Produced, ...CurrentStoreMutators, ...Mcs]>
+
+export type PipeApply<
+  T,
+  Required extends MutatorTuple,
+  StoreMutators extends MutatorTuple,
+> = <Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
+  initializer: StateCreator<T, [...Mps, ...Required], Mcs>,
+) => StateCreator<T, Mps, [...StoreMutators, ...Mcs]>
+
+export interface PipeBuilder<
+  T,
+  Required extends MutatorTuple = [],
+  StoreMutators extends MutatorTuple = [],
+> {
+  use<Consumed extends MutatorTuple, Produced extends MutatorTuple>(
+    middleware: PipeAnyMiddleware<Consumed, Produced> &
+      PipeCompatibleAnyMiddleware<StoreMutators, Consumed, Produced> &
+      PipeMiddlewareOrderGuard<StoreMutators, Produced>,
+  ): PipeBuilder<
+    T,
+    [...Consumed, ...Required],
+    [...Produced, ...StoreMutators]
+  >
+  use<Consumed extends MutatorTuple, Produced extends MutatorTuple>(
+    middleware: PipeMiddleware<T, Consumed, Produced> &
+      PipeCompatibleMiddleware<T, StoreMutators, Consumed, Produced> &
+      PipeMiddlewareOrderGuard<StoreMutators, Produced>,
+  ): PipeBuilder<
+    T,
+    [...Consumed, ...Required],
+    [...Produced, ...StoreMutators]
+  >
+  create(
+    initializer: StateCreator<T, Required, [], T>,
+  ): StateCreator<T, [], StoreMutators, T>
+}
