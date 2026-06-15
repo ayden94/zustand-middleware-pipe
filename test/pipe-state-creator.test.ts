@@ -9,10 +9,10 @@ import {
   type DevtoolsMutator,
   type ImmerMutator,
   type PersistMutator,
-  type PipeBuilder,
   type PipeMiddlewareStack,
   type PipeCanUseMiddleware,
   type PipeAnyMiddleware,
+  type PipeMiddleware,
   type SubscribeWithSelectorMutator,
 } from '../src/index.js'
 import * as middleware from '../src/middleware.js'
@@ -46,10 +46,10 @@ function createMemoryStorage(): StateStorage {
   }
 }
 
-function createOrderMarkerMiddleware(
+function createOrderMarkerMiddleware<T>(
   name: string,
   events: string[],
-): PipeAnyMiddleware<[], []> {
+): PipeMiddleware<T, [], []> {
   return (initializer) => (set, get, store) => {
     events.push(`${name}:before`)
     const state = initializer(set, get, store)
@@ -83,10 +83,18 @@ describe('pipe', () => {
     expect('pipeStore' in publicApi).toBe(false)
   })
 
-  it('creates a typed builder when called without a base value', () => {
-    const builder = pipe<CounterState>()
+  it('starts a typed builder from pipe.use', () => {
+    const builder = pipe
+      .use(immer())
+      .use(persist<CounterState, PersistedCounterState>({
+        name: 'counter-builder',
+        storage: createJSONStorage<PersistedCounterState>(() =>
+          createMemoryStorage(),
+        ),
+        partialize: (state) => ({ count: state.count }),
+      }))
 
-    expectTypeOf(builder).toEqualTypeOf<PipeBuilder<CounterState>>()
+    expect(typeof pipe.use).toBe('function')
     expect(typeof builder.use).toBe('function')
     expect(typeof builder.create).toBe('function')
   })
@@ -104,7 +112,7 @@ describe('pipe', () => {
 
   it('builds a Zustand middleware stack while preserving store extensions', () => {
     const store = createStore<CounterState>()(
-      pipe<CounterState>()
+      pipe
         .use(immer())
         .use(persist<CounterState, PersistedCounterState>({
           name: 'counter',
@@ -161,9 +169,9 @@ describe('pipe', () => {
     const events: string[] = []
 
     const store = createStore<{ count: number }>()(
-      pipe<{ count: number }>()
-        .use(createOrderMarkerMiddleware('inner', events))
-        .use(createOrderMarkerMiddleware('outer', events))
+      pipe
+        .use(createOrderMarkerMiddleware<{ count: number }>('inner', events))
+        .use(createOrderMarkerMiddleware<{ count: number }>('outer', events))
         .create(() => ({ count: 0 })),
     )
 

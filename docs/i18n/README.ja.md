@@ -63,8 +63,7 @@ import {
 } from 'zustand-middleware-pipe/middleware'
 
 const store = createStore<CounterState>()(
-  pipe<CounterState>()
-    .use(immer())
+  pipe.use(immer())
     .use(persist<CounterState>({ name: 'counter' }))
     .use(subscribeWithSelector())
     .use(devtools({ name: 'CounterStore' }))
@@ -114,8 +113,7 @@ npm install immer
 ## API
 
 ```ts
-pipe<T>()
-  .use(immer())
+pipe.use(immer())
   .use(persist<T, PersistedState>(options))
   .use(subscribeWithSelector())
   .use(devtools(options?))
@@ -130,7 +128,7 @@ subscribeWithSelector()
 devtools(options?)
 ```
 
-`pipe<T>()` が primary API です。middleware list が唯一の source of truth になるため、base creator は builder chain から計算された `set` 型を受け取ります。`immer()` を使うと `.create(...)` の中で draft mutation が使え、`devtools(...)` を使うと action name 引数が使え、`subscribeWithSelector()` を使うと最終 store に selector subscribe overload が反映されます。
+`pipe.use(...)` が primary API です。middleware list が唯一の source of truth になるため、base creator は builder chain から計算された `set` 型を受け取ります。`immer()` を使うと `.create(...)` の中で draft mutation が使え、`devtools(...)` を使うと action name 引数が使え、`subscribeWithSelector()` を使うと最終 store に selector subscribe overload が反映されます。
 
 Immer 以外の wrapper は middleware barrel から import し、Immer は専用 subpath から import してください。
 
@@ -145,15 +143,14 @@ import {
 
 root entry point は middleware wrapper を import しません。middleware barrel も `immer` を import しないため、`persist`, `subscribeWithSelector`, `devtools` だけを使う consumer は optional Immer peer に触れません。wrapper 名は Zustand の元の middleware 名に意図的に合わせており、package subpath が pipe-aware 版であることを区別します。
 
-`definePipeStateCreator<T, Middlewares>(baseCreator)` は既存の `pipe(...)` composition code 向けに残しています。新しい store では middleware list を builder chain だけで管理できる `pipe<T>()` を推奨します。
+`definePipeStateCreator<T, Middlewares>(baseCreator)` は既存の `pipe(...)` composition code 向けに残しています。新しい store では middleware list を builder chain だけで管理できる `pipe.use(...)` を推奨します。
 
 ```ts
 const store = createStore<CounterState>()(
-  pipe<CounterState>()
-    .use(persist<CounterState, Pick<CounterState, 'count'>>({
-      name: 'counter',
-      partialize: (state) => ({ count: state.count }),
-    }))
+  pipe.use(persist<CounterState, Pick<CounterState, 'count'>>({
+    name: 'counter',
+    partialize: (state) => ({ count: state.count }),
+  }))
     .use(subscribeWithSelector())
     .use(devtools({ name: 'CounterStore' }))
     .create((set) => ({
@@ -168,7 +165,7 @@ builder chain 自体が type-safety contract です。`.use(immer())` を外す�
 
 ```ts
 createStore<CounterState>()(
-  pipe<CounterState>()
+  pipe
     // .use(immer()) // この middleware が抜けると creator 内で TypeScript error になります
     .use(persist<CounterState>({ name: 'counter' }))
     .create((set) => ({
@@ -196,7 +193,7 @@ persist<CounterState, Pick<CounterState, 'count'>>({
 - すでに動いている store を、この helper を使うためだけに書き換えないでください。
 - built-in wrapper は inner から outer の順で追加してください。つまり `.use(immer())`, `.use(persist(...))`, `.use(subscribeWithSelector())`, `.use(devtools(...))` の順です。逆順の built-in wrapper は `.use(...)` で拒否されます。
 - Zustand の devtools type は `store.devtools` を公開しますが、runtime property は通常の Zustand devtools behavior に依存します。たとえば devtools が無効化されている場合や Redux DevTools extension がない場合は、利用できないことがあります。
-- `definePipeStateCreator` は compatibility API です。新しいコードでは `pipe<T>()` と unprefixed middleware wrapper を推奨します。
+- `definePipeStateCreator` は compatibility API です。新しいコードでは `pipe.use(...)` と unprefixed middleware wrapper を推奨します。
 - 任意の third-party middleware composition は runtime `reduce` だけでは解決できません。wrapper には正しい mutator tuple type が必要です。
 
 ## Development

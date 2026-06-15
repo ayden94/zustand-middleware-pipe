@@ -71,8 +71,7 @@ import {
 } from 'zustand-middleware-pipe/middleware'
 
 const store = createStore<CounterState>()(
-  pipe<CounterState>()
-    .use(immer())
+  pipe.use(immer())
     .use(persist<CounterState>({ name: 'counter' }))
     .use(subscribeWithSelector())
     .use(devtools({ name: 'CounterStore' }))
@@ -121,8 +120,7 @@ This package is ESM-only.
 ## API
 
 ```ts
-pipe<T>()
-  .use(immer())
+pipe.use(immer())
   .use(persist<T, PersistedState>(options))
   .use(subscribeWithSelector())
   .use(devtools(options?))
@@ -137,7 +135,7 @@ subscribeWithSelector()
 devtools(options?)
 ```
 
-`pipe<T>()` is the primary API. It keeps the middleware list as the only source of truth, so the base creator receives the right `set` type from the builder chain. If you use `immer()`, draft mutation is available in `.create(...)`; if you use `devtools(...)`, action names are accepted; if you use `subscribeWithSelector()`, the final store gets the selector subscribe overload.
+`pipe.use(...)` is the primary API. It keeps the middleware list as the only source of truth, so the base creator receives the right `set` type from the builder chain. If you use `immer()`, draft mutation is available in `.create(...)`; if you use `devtools(...)`, action names are accepted; if you use `subscribeWithSelector()`, the final store gets the selector subscribe overload.
 
 Import non-Immer wrappers from the middleware barrel, and import Immer from its dedicated subpath:
 
@@ -152,15 +150,14 @@ import {
 
 The root entry point does not import any middleware wrappers. The middleware barrel also avoids importing `immer`, so non-Immer consumers can use `persist`, `subscribeWithSelector`, and `devtools` without touching the optional Immer peer. The wrapper names intentionally mirror Zustand's middleware names; the package subpath is what makes them the pipe-aware versions.
 
-`definePipeStateCreator<T, Middlewares>(baseCreator)` remains available for older `pipe(...)` composition code, but `pipe<T>()` is preferred for new stores because the builder chain is the only middleware list you have to maintain.
+`definePipeStateCreator<T, Middlewares>(baseCreator)` remains available for older `pipe(...)` composition code, but `pipe.use(...)` is preferred for new stores because the builder chain is the only middleware list you have to maintain.
 
 ```ts
 const store = createStore<CounterState>()(
-  pipe<CounterState>()
-    .use(persist<CounterState, Pick<CounterState, 'count'>>({
-      name: 'counter',
-      partialize: (state) => ({ count: state.count }),
-    }))
+  pipe.use(persist<CounterState, Pick<CounterState, 'count'>>({
+    name: 'counter',
+    partialize: (state) => ({ count: state.count }),
+  }))
     .use(subscribeWithSelector())
     .use(devtools({ name: 'CounterStore' }))
     .create((set) => ({
@@ -175,7 +172,7 @@ The builder chain is the type-safety contract. If you remove `.use(immer())`, dr
 
 ```ts
 createStore<CounterState>()(
-  pipe<CounterState>()
+  pipe
     // .use(immer()) // TypeScript error in the creator when this middleware is missing
     .use(persist<CounterState>({ name: 'counter' }))
     .create((set) => ({
@@ -203,7 +200,7 @@ persist<CounterState, Pick<CounterState, 'count'>>({
 - Do not rewrite working stores just to use this helper.
 - Built-in wrappers must be added from inner to outer: `.use(immer())`, `.use(persist(...))`, `.use(subscribeWithSelector())`, then `.use(devtools(...))`. Reversed built-in order is rejected at `.use(...)`.
 - Zustand's devtools type exposes `store.devtools`, but the runtime property depends on normal Zustand devtools behavior. For example, it may not be available when devtools are disabled or no Redux DevTools extension is present.
-- `definePipeStateCreator` is a compatibility API; prefer `pipe<T>()` with unprefixed middleware wrappers for new code.
+- `definePipeStateCreator` is a compatibility API; prefer `pipe.use(...)` with unprefixed middleware wrappers for new code.
 - Arbitrary third-party middleware composition is not solved by the runtime `reduce`; wrappers need correct mutator tuple types.
 
 ## Development

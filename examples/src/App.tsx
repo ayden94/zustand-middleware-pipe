@@ -24,9 +24,9 @@ function App() {
     <main className="app-shell">
       <section className="hero-card" aria-labelledby="demo-title">
         <p className="eyebrow">zustand-middleware-pipe</p>
-        <h1 id="demo-title">pipe() 미들웨어 테스트</h1>
+        <h1 id="demo-title">pipe.use() 미들웨어 테스트</h1>
         <p className="description">
-          <code>pipe()</code>로 Zustand middleware를 왼쪽에서 오른쪽 순서로
+          <code>pipe.use()</code>로 Zustand middleware를 왼쪽에서 오른쪽 순서로
           조합했습니다. 카운터 값과 라벨은 <code>persist</code>로 localStorage에
           저장됩니다.
         </p>

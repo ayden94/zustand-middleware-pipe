@@ -25,8 +25,7 @@ const initialState = {
 } satisfies PersistedCounterState
 
 export const useCounterStore = create<CounterState>()(
-  pipe<CounterState>()
-    .use(immer())
+  pipe.use(immer())
     .use(persist<CounterState, PersistedCounterState>({
       name: 'zustand-middleware-pipe-demo',
       storage: createJSONStorage<PersistedCounterState>(() => localStorage),
