@@ -2,42 +2,57 @@
 
 [English](../../README.md) · [한국어](README.ko.md) · 日本語
 
+[![npm version](https://img.shields.io/npm/v/zustand-middleware-pipe)](https://www.npmjs.com/package/zustand-middleware-pipe)
+[![license](https://img.shields.io/npm/l/zustand-middleware-pipe)](../../LICENSE)
+[![ESM only](https://img.shields.io/badge/ESM-only-blue)](https://gist.github.com/sindresorhus/a39789f98801d908bbc7ff3ecc99d99c)
+
 Zustand のミドルウェアスタックを、実際に考える順番で書けるようにします。
 
-`immer`、`persist`、`subscribeWithSelector`、`devtools` を 1 つの store に混ぜたことがあるなら、きっとこんな瞬間があったはずです。
+## クイックスタート
 
-> 「待って……この options ってどの middleware の設定だっけ？」
+```sh
+npm install zustand-middleware-pipe zustand
+```
 
-Zustand の通常の inside-out なミドルウェア記法は強力です。ただ、スタックが実際のアプリコードらしく厚くなってくると、コードは後ろ向きに読まされます。`persist` の options は真ん中にあり、`devtools` は外側からすべてを包み、`immer` は内側から `set` の型を変えます。次に読む人は、store setup を理解するために頭の中で括弧を 1 枚ずつ剥がさなければなりません。
+```ts
+import { create } from 'zustand'
+import { pipe } from 'zustand-middleware-pipe'
+import { immer } from 'zustand-middleware-pipe/middleware/immer'
+import { devtools, persist, subscribeWithSelector } from 'zustand-middleware-pipe/middleware'
 
-`zustand-middleware-pipe` は同じ runtime behavior を保ったまま、setup を左から右へ読めるようにします。
+const useCounterStore = create<CounterState>()(
+  pipe
+    .use(immer())
+    .use(persist<CounterState>({ name: 'counter' }))
+    .use(subscribeWithSelector())
+    .use(devtools({ name: 'CounterStore' }))
+    .create((set) => ({
+      count: 0,
+      inc: () => set((state) => { state.count += 1 }, false, 'counter/inc'),
+    })),
+)
+```
 
-1. typed pipe builder を開始する
-2. Immer を追加する
-3. Persist を追加する
-4. selector subscription を追加する
-5. DevTools を追加する
-6. 最終的な `set` 型が反映された base state creator を書く
-
-魔法の store replacement ではありません。新しい state model でもありません。密度の高い middleware stack をもう一度読みやすくする、小さな userland helper です。
+それだけです。魔法の store replacement でも、新しい state model でもありません。密度の高い middleware stack をもう一度読みやすくする、小さな userland helper です。
 
 この package は [pmndrs/zustand#3449](https://github.com/pmndrs/zustand/discussions/3449) で議論されたアイデアをもとにしています。
 
+---
+
 ## 問題: middleware stack は逆向きに読まされる
 
-Zustand の middleware stack は通常 inside-out に書きます。
+Zustand の middleware は inside-out に書きます。最も内側の呼び出しが base creator で、最も外側の呼び出しが runtime で最後に適用される middleware です。4 つの middleware が積まれると、形が反転します:
 
 ```ts
-const store = createStore<CounterState>()(
+// runtime 順序: immer → persist → subscribeWithSelector → devtools
+// 記述順序:     devtools(subscribeWithSelector(persist(immer(...)))) ← 逆向き
+const useCounterStore = create<CounterState>()(
   devtools(
     subscribeWithSelector(
       persist(
         immer((set) => ({
           count: 0,
-          inc: () =>
-            set((state) => {
-              state.count += 1
-            }),
+          inc: () => set((state) => { state.count += 1 }),
         })),
         { name: 'counter' },
       ),
@@ -47,68 +62,55 @@ const store = createStore<CounterState>()(
 )
 ```
 
-これは正しい Zustand code です。ただ、スタックが大きくなるほど形を追いづらくなり、runtime order はネストの中に隠れてしまいます。
+options は散らばります。`persist` の options は中間に埋まり、`devtools` の options はファイルの下に離れ、次の読み手は store の形を理解するためにすべての層を頭の中で剥がさなければなりません。
 
 ## 解決: スタックを pipeline として書く
 
-この helper を使うと、同じ runtime order を左から右へ書けます。
+`pipe` を使うと、同じ runtime 順序を左から右へ書けます:
 
 ```ts
-import { pipe } from 'zustand-middleware-pipe'
-import { immer } from 'zustand-middleware-pipe/middleware/immer'
-import {
-  devtools,
-  persist,
-  subscribeWithSelector,
-} from 'zustand-middleware-pipe/middleware'
-
-const store = createStore<CounterState>()(
-  pipe.use(immer())
-    .use(persist<CounterState>({ name: 'counter' }))
-    .use(subscribeWithSelector())
-    .use(devtools({ name: 'CounterStore' }))
-    .create((set) => ({
-      count: 0,
-      inc: () =>
-        set(
-          (state) => {
-            state.count += 1
-          },
-          false,
-          'counter/inc',
-        ),
-    })),
-)
+// 記述順序 = runtime 順序 ↓
+pipe
+  .use(immer())
+  .use(persist<CounterState>({ name: 'counter' }))
+  .use(subscribeWithSelector())
+  .use(devtools({ name: 'CounterStore' }))
+  .create((set) => ({ ... }))
 ```
 
-このコードは同じ nested middleware stack に評価されます。
+### Before / After 比較
+
+| | Before (inside-out) | After (pipe) |
+|---|---|---|
+| **読む順序** | 外側の wrapper から、base creator が最後 | 適用順そのまま左から右 |
+| **options の位置** | ネストの各レベルに散在 | 各 `.use(...)` 呼び出しにインライン |
+| **`set` 型** | ネスト構造から推論 | builder chain が積み上げて計算 |
+| **middleware 追加** | 式全体を再度ラップ | 正しい位置に `.use(...)` を追加 |
+
+評価結果は同一です:
 
 ```ts
+// pipe は runtime でこれとまったく同じになります
 devtools(subscribeWithSelector(persist(immer(baseCreator), options)), options)
 ```
 
-`pipe` は middleware の順序を自動で並べ替えません。書いた `.use()`
-順をそのまま適用します。前の `.use()` は base creator に近く、後の
-`.use()` はそれまで作った stack を外側から包みます。そのため上の例では
-`devtools()` を最後に置き、`devtools(...)` が outermost になる
-Zustand の一般的な形を保っています。これは `devtools` をできるだけ遅く
-置くという Zustand TypeScript guide の推奨と合います。built-in pipe wrapper
-については、この順序を `pipe` API の契約として扱い、逆順は `.use(...)`
-で拒否します。
+---
 
-## Install
+## インストール
 
 ```sh
 npm install zustand-middleware-pipe zustand
 ```
 
-`immer()` を使う場合だけ、追加で `immer` を install してください。
+`immer()` を使う場合だけ、追加で `immer` をインストールしてください:
 
 ```sh
 npm install immer
 ```
 
-この package は ESM-only です。
+この package は **ESM-only** です。
+
+---
 
 ## API
 
@@ -118,21 +120,29 @@ pipe.use(immer())
   .use(subscribeWithSelector())
   .use(devtools(options?))
   .create(baseCreator)
+```
 
+### Middleware wrapper
+
+```ts
 immer()
 persist<T, PersistedState = T, PersistReturn = unknown>(options)
 subscribeWithSelector()
 devtools(options?)
-combine(initialState, creator)
-redux(reducer, initialState)
+combine(initialState, creator)   // .create() の中で使用
+redux(reducer, initialState)     // .create() の中で使用
 ```
 
-`pipe.use(...)` が primary API です。middleware list が唯一の source of truth になるため、base creator は builder chain から計算された `set` 型を受け取ります。`immer()` を使うと `.create(...)` の中で draft mutation が使え、`devtools(...)` を使うと action name 引数が使え、`subscribeWithSelector()` を使うと最終 store に selector subscribe overload が反映されます。
+### import パス
 
-Immer 以外の wrapper は middleware barrel から import し、Immer は専用 subpath から import してください。
+Immer 以外の wrapper は middleware barrel から import します。Immer は optional peer として保持するため専用 subpath を使います:
 
 ```ts
+import { create } from 'zustand'
+import { pipe } from 'zustand-middleware-pipe'
+
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
+
 import {
   combine,
   devtools,
@@ -142,31 +152,55 @@ import {
 } from 'zustand-middleware-pipe/middleware'
 ```
 
-root entry point は middleware wrapper を import しません。middleware barrel も `immer` を import しないため、`persist`, `subscribeWithSelector`, `devtools`, `combine`, `redux` を使う non-Immer consumer は optional Immer peer に触れません。wrapper 名は Zustand の元の middleware 名に意図的に合わせており、package subpath が pipe-aware wrapper であることを明確にします。
+### builder chain の型安全性
+
+`pipe.use(...)` は middleware を追加するたびに mutator 型を積み上げます。最終的な `.create(baseCreator)` は完全に合成された `set` 型を受け取るため、TypeScript が各 middleware の貢献を検査します:
+
+- `.use(immer())` → `.create(...)` の中で draft mutation が有効になる
+- `.use(devtools(...))` → `set` の第三引数に action name を渡せるようになる
+- `.use(subscribeWithSelector())` → store に selector subscribe overload が反映される
+
+`.use(...)` 呼び出しを削除すると、対応する機能が型から即座に消えます:
 
 ```ts
-const store = createStore<CounterState>()(
-  pipe.use(persist<CounterState, Pick<CounterState, 'count'>>({
-    name: 'counter',
-    partialize: (state) => ({ count: state.count }),
-  }))
-    .use(subscribeWithSelector())
-    .use(devtools({ name: 'CounterStore' }))
+create<CounterState>()(
+  pipe
+    // .use(immer()) ← この行を削除すると下の draft mutation が TypeScript エラーになります
+    .use(persist<CounterState>({ name: 'counter' }))
     .create((set) => ({
       count: 0,
       inc: () =>
-        set((state) => ({ count: state.count + 1 }), false, 'counter/inc'),
+        set((state) => {
+          state.count += 1 // ← エラー: set はここで関数を受け取りません
+        }),
     })),
 )
 ```
 
-`combine(...)` と `redux(...)` は公式 Zustand の state creator helper なので、`.use(...)` ではなく `.create(...)` の中に置きます。
+### `persist` と部分的な state
+
+`partialize` を使う場合は、第二 generic に persisted-state 型を渡してください:
 
 ```ts
-type CounterAction = { type: 'inc' }
-type Dispatch = (action: CounterAction) => CounterAction
+pipe
+  .use(persist<CounterState, Pick<CounterState, 'count'>>({
+    name: 'counter',
+    partialize: (state) => ({ count: state.count }),
+  }))
+  .use(subscribeWithSelector())
+  .use(devtools({ name: 'CounterStore' }))
+  .create((set) => ({
+    count: 0,
+    inc: () => set((state) => ({ count: state.count + 1 }), false, 'counter/inc'),
+  }))
+```
 
-const combinedStore = createStore<CounterState>()(
+### `combine` と `redux`
+
+`combine` と `redux` は middleware ではなく Zustand の state-creator helper なので、`.create(...)` の中に置きます:
+
+```ts
+const useCombinedCounterStore = create<CounterState>()(
   pipe
     .use(devtools({ name: 'CombinedCounterStore' }))
     .create(
@@ -176,48 +210,29 @@ const combinedStore = createStore<CounterState>()(
     ),
 )
 
-const reduxStore = createStore<CounterState & { dispatch: Dispatch }>()(
+type CounterAction = { type: 'inc' }
+type Dispatch = (action: CounterAction) => CounterAction
+
+const useReduxCounterStore = create<CounterState & { dispatch: Dispatch }>()(
   pipe
     .use(devtools({ name: 'ReduxCounterStore' }))
     .create(redux(reducer, { count: 0 })),
 )
 ```
 
-builder chain 自体が type-safety contract です。`.use(immer())` を外すと `.create(...)` 内の draft mutation が type-check されません。`.use(devtools(...))` を外すと `set` に渡す action name 引数が type-check されません。
-
-```ts
-createStore<CounterState>()(
-  pipe
-    // .use(immer()) // この middleware が抜けると creator 内で TypeScript error になります
-    .use(persist<CounterState>({ name: 'counter' }))
-    .create((set) => ({
-      count: 0,
-      inc: () =>
-        set((state) => {
-          state.count += 1
-        }),
-    })),
-)
-```
-
-`persist` で `partialize` を使う場合は、persisted-state type を `persist` に渡してください。
-
-```ts
-persist<CounterState, Pick<CounterState, 'count'>>({
-  name: 'counter',
-  partialize: (state) => ({ count: state.count }),
-})
-```
+---
 
 ## 重要な caveat
 
-- これは **公式 Zustand guidance ではありません**。
-- すでに動いている store を、この helper を使うためだけに書き換えないでください。
-- built-in wrapper は inner から outer の順で追加してください。つまり `.use(immer())`, `.use(persist(...))`, `.use(subscribeWithSelector())`, `.use(devtools(...))` の順です。逆順の built-in wrapper は `.use(...)` で拒否されます。
-- Zustand の devtools type は `store.devtools` を公開しますが、runtime property は通常の Zustand devtools behavior に依存します。たとえば devtools が無効化されている場合や Redux DevTools extension がない場合は、利用できないことがあります。
-- 任意の third-party middleware composition は runtime `reduce` だけでは解決できません。wrapper には正しい mutator tuple type が必要です。
+- **公式 Zustand guidance ではありません。** これは userland の実験です。
+- **すでに動いている store を書き直さないでください。**
+- **built-in wrapper の順序は強制されます。** inner-to-outer の順で追加してください: `.use(immer())` → `.use(persist(...))` → `.use(subscribeWithSelector())` → `.use(devtools(...))`. 逆順の built-in wrapper は `.use(...)` で拒否されます。
+- **`store.devtools` の可用性**は通常の Zustand devtools の動作に依存します。devtools が無効化されているか Redux DevTools extension がない場合は、利用できないことがあります。
+- **サードパーティ middleware** は自動的には合成できません。builder と連携するには、wrapper に正しい mutator tuple 型が必要です。
 
-## Development
+---
+
+## 開発
 
 ```sh
 npm install
@@ -226,13 +241,13 @@ npm run verify
 
 `npm run verify` は typecheck、Vitest、declaration build を実行します。
 
-## Example
+## サンプル
 
-Vite React example は `examples/` にあり、local `file:..` dependency でこの package を使います。
+Vite React のサンプルは `examples/` にあり、local `file:..` dependency でこの package を使っています。
 
 ```sh
 npm run example:install
 npm run example:dev
 ```
 
-package root から `npm run example:verify` を実行すると、example を build して lint します。
+package root から `npm run example:verify` を実行すると、サンプルを build して lint します。
