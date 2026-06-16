@@ -16,6 +16,7 @@ import {
 import type { PipeCanUseMiddleware } from '../src/types'
 import * as middleware from '../src/middleware'
 import { immer } from '../src/middleware/immer'
+import { temporal } from '../src/middleware/zundo'
 import {
   combine,
   createJSONStorage,
@@ -469,6 +470,7 @@ describe('pipe', () => {
 
   it('exports non-Immer wrappers from the middleware barrel', () => {
     expect('immer' in middleware).toBe(false)
+    expect('temporal' in middleware).toBe(false)
     expect(typeof middleware.combine).toBe('function')
     expect(typeof middleware.createJSONStorage).toBe('function')
     expect(middleware.createJSONStorage).toBe(officialCreateJSONStorage)
@@ -481,6 +483,10 @@ describe('pipe', () => {
 
   it('exports Immer from the dedicated middleware subpath', () => {
     expect(typeof immer).toBe('function')
+  })
+
+  it('exports zundo temporal from the dedicated middleware subpath', () => {
+    expect(typeof temporal).toBe('function')
   })
 
   it('builds a Zustand middleware stack while preserving store extensions', () => {
@@ -777,6 +783,26 @@ describe('pipe', () => {
       'marker:after',
       'marker:after',
     ])
+  })
+
+  it('composes the optional zundo temporal middleware subpath', () => {
+    const store = createStore<Pick<CounterState, 'count' | 'inc'>>()(
+      pipe.use(temporal()).create((set) => ({
+        count: 0,
+        inc: () => {
+          set((state) => ({ count: state.count + 1 }))
+        },
+      })),
+    )
+
+    store.getState().inc()
+
+    expect(store.getState().count).toBe(1)
+    expect(typeof store.temporal.getState().undo).toBe('function')
+
+    store.temporal.getState().undo()
+
+    expect(store.getState().count).toBe(0)
   })
 
   it('honors pipeable middleware order metadata for tagged userland middleware', () => {

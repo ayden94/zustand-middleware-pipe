@@ -107,6 +107,12 @@ Install `immer` only if your stack includes `immer()`:
 npm install immer
 ```
 
+Install `zundo` only if your stack includes `temporal()`:
+
+```sh
+npm install zundo
+```
+
 This package is **ESM-only** and assumes bundler-style module resolution for its internal relative imports.
 
 ---
@@ -125,6 +131,7 @@ pipe.use(devtools(options?))
 
 ```ts
 immer()
+temporal(options?)              // use from /middleware/zundo
 persist<T, PersistedState = T, PersistReturn = unknown>(options)
 subscribeWithSelector()
 devtools(options?)
@@ -134,12 +141,13 @@ redux(reducer, initialState)     // use inside .create()
 
 ### Import paths
 
-Non-Immer wrappers and storage helpers come from the middleware barrel. Immer has its own subpath to keep it an optional peer:
+Core wrappers and storage helpers come from the middleware barrel. Optional adapters stay on dedicated subpaths so their peer packages are only needed when you import them:
 
 ```ts
 import { pipe } from 'zustand-middleware-pipe'
 
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
+import { temporal } from 'zustand-middleware-pipe/middleware/zundo'
 
 import {
   combine,
@@ -193,6 +201,63 @@ pipe
     inc: () => set((state) => ({ count: state.count + 1 }), false, 'counter/inc'),
   }))
 ```
+
+### `zundo` temporal history
+
+Use the zundo subpath when you want undo/redo history. Install `zundo` separately, then add `temporal()` to the pipe:
+
+```ts
+import { temporal } from 'zustand-middleware-pipe/middleware/zundo'
+
+const useCounterStore = create<CounterState>()(
+  pipe
+    .use(temporal<CounterState>({ limit: 50 }))
+    .create((set) => ({
+      count: 0,
+      inc: () => set((state) => ({ count: state.count + 1 })),
+    })),
+)
+
+useCounterStore.temporal.getState().undo()
+```
+
+`temporal()` keeps zundo's own mutator typing, including `store.temporal`. If you also persist the main store or the temporal store, follow zundo's `wrapTemporal` guidance; this package does not infer a universal safe order for every zundo + persistence setup.
+
+You can also use `pipe` inside `wrapTemporal` when you want to persist the undo/redo history store itself:
+
+```ts
+import { pipe } from 'zustand-middleware-pipe'
+import { createJSONStorage, persist } from 'zustand-middleware-pipe/middleware'
+import {
+  temporal,
+  type TemporalState,
+} from 'zustand-middleware-pipe/middleware/zundo'
+
+type CounterHistory = TemporalState<CounterState>
+type PersistedCounterHistory = Pick<CounterHistory, 'futureStates' | 'pastStates'>
+
+pipe
+  .use(
+    temporal<CounterState>({
+      wrapTemporal: (temporalCreator) =>
+        pipe
+          .use(
+            persist<CounterHistory, PersistedCounterHistory>({
+              name: 'counter-history',
+              storage: createJSONStorage<PersistedCounterHistory>(() => localStorage),
+              partialize: (history) => ({
+                futureStates: history.futureStates,
+                pastStates: history.pastStates,
+              }),
+            }),
+          )
+          .create(temporalCreator),
+    }),
+  )
+  .create((set) => ({ ... }))
+```
+
+The outer `pipe` composes the main store. The inner `pipe` composes zundo's temporal history store.
 
 ### `combine` and `redux`
 
@@ -250,9 +315,10 @@ pipe
 - **Do not rewrite working stores** just to use this helper.
 - **Bundler resolution is expected.** The package is emitted as ESM with extensionless internal relative imports, so consume it through a bundler-compatible toolchain.
 - **Built-in wrapper order and duplicates are enforced.** Add package-provided wrappers outer-to-inner: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. TypeScript and the runtime `.use(...)` boundary reject reversed built-in order and duplicate package built-ins.
-- **Runtime guards are scoped to tagged package built-ins.** Only wrappers returned by this package's `devtools`, `subscribeWithSelector`, `persist`, and `immer` adapters are checked; arbitrary untagged, userland, or third-party middleware is not introspected for order or duplicates.
+- **Runtime guards are scoped to tagged pipeable wrappers.** Package built-ins (`devtools`, `subscribeWithSelector`, `persist`, `immer`) and opt-in adapters such as `zundo` carry explicit metadata for duplicate/order checks. Arbitrary untagged, userland, or third-party middleware is not introspected for order or duplicates.
 - **Userland order metadata is opt-in.** `definePipeableMiddleware` only trusts explicit ids and `order.before` / `order.after` hints. It does not inspect function names or source code, and it does not make arbitrary third-party middleware automatically safe.
 - **Direct reexports keep Zustand helper semantics.** `combine`, `redux`, and `createJSONStorage` are direct Zustand helpers; `combine` and `redux` belong inside `.create(...)`, not `.use(...)`, and `immer` remains available from the dedicated `zustand-middleware-pipe/middleware/immer` subpath.
+- **Optional third-party adapters stay on dedicated subpaths.** `zundo` is available from `zustand-middleware-pipe/middleware/zundo` and requires installing `zundo` in the consuming app.
 - **`store.devtools` availability** depends on normal Zustand devtools behavior. It may not exist when devtools are disabled or the Redux DevTools extension is absent.
 - **Third-party middleware** is not automatically composable. Wrappers need correct mutator tuple types to work with the builder.
 

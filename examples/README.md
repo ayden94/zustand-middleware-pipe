@@ -1,6 +1,6 @@
 # zustand-middleware-pipe React example
 
-This Vite app exercises the local `zustand-middleware-pipe` package with multiple store examples through a `file:..` dependency.
+This Vite app exercises the local `zustand-middleware-pipe` package with routed React examples through a `file:..` dependency. The UI uses Tailwind CSS so each middleware composition has its own focused page.
 
 It demonstrates the recommended middleware imports:
 
@@ -15,13 +15,17 @@ import {
   subscribeWithSelector,
 } from 'zustand-middleware-pipe/middleware'
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
+import { temporal } from 'zustand-middleware-pipe/middleware/zundo'
 ```
 
-The page includes:
+The app includes:
 
 - a full `.use(devtools()).use(subscribeWithSelector()).use(persist()).use(immer())` chain
+- a `pipe.use(temporal()).create(...)` zundo undo/redo history example
 - a `pipe.use(devtools()).create(combine(...))` terminal helper example
 - a `pipe.use(devtools()).create(redux(...))` terminal helper example
+- route-level navigation between examples with `react-router-dom`
+- Tailwind-powered layout and component styling
 
 Run it from the repository root:
 

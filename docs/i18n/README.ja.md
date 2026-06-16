@@ -107,6 +107,12 @@ npm install zustand-middleware-pipe zustand
 npm install immer
 ```
 
+`temporal()` を使う場合だけ、追加で `zundo` をインストールしてください:
+
+```sh
+npm install zundo
+```
+
 この package は **ESM-only** で、内部の相対 import には bundler-style module resolution を前提とします。
 
 ---
@@ -125,6 +131,7 @@ pipe.use(devtools(options?))
 
 ```ts
 immer()
+temporal(options?)              // /middleware/zundo から使用
 persist<T, PersistedState = T, PersistReturn = unknown>(options)
 subscribeWithSelector()
 devtools(options?)
@@ -134,13 +141,14 @@ redux(reducer, initialState)     // .create() の中で使用
 
 ### import パス
 
-Immer 以外の wrapper と storage helper は middleware barrel から import します。Immer は optional peer として保持するため専用 subpath を使います:
+Core wrapper と storage helper は middleware barrel から import します。任意の adapter は専用 subpath に置くため、その peer package はその subpath を import するときだけ必要です:
 
 ```ts
 import { create } from 'zustand'
 import { pipe } from 'zustand-middleware-pipe'
 
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
+import { temporal } from 'zustand-middleware-pipe/middleware/zundo'
 
 import {
   combine,
@@ -194,6 +202,63 @@ pipe
     inc: () => set((state) => ({ count: state.count + 1 }), false, 'counter/inc'),
   }))
 ```
+
+### `zundo` temporal history
+
+undo/redo history が必要な場合は zundo subpath を使います。`zundo` を別途インストールしてから、pipe に `temporal()` を追加します:
+
+```ts
+import { temporal } from 'zustand-middleware-pipe/middleware/zundo'
+
+const useCounterStore = create<CounterState>()(
+  pipe
+    .use(temporal<CounterState>({ limit: 50 }))
+    .create((set) => ({
+      count: 0,
+      inc: () => set((state) => ({ count: state.count + 1 })),
+    })),
+)
+
+useCounterStore.temporal.getState().undo()
+```
+
+`temporal()` は `store.temporal` を含む zundo の mutator typing を維持します。main store や temporal store を persist する場合は、zundo の `wrapTemporal` guidance に従ってください。この package は、すべての zundo + persistence 構成に対して単一の安全な順序を推論しません。
+
+undo/redo history store 自体を persist したい場合は、`wrapTemporal` の中でもう一度 `pipe` を使えます:
+
+```ts
+import { pipe } from 'zustand-middleware-pipe'
+import { createJSONStorage, persist } from 'zustand-middleware-pipe/middleware'
+import {
+  temporal,
+  type TemporalState,
+} from 'zustand-middleware-pipe/middleware/zundo'
+
+type CounterHistory = TemporalState<CounterState>
+type PersistedCounterHistory = Pick<CounterHistory, 'futureStates' | 'pastStates'>
+
+pipe
+  .use(
+    temporal<CounterState>({
+      wrapTemporal: (temporalCreator) =>
+        pipe
+          .use(
+            persist<CounterHistory, PersistedCounterHistory>({
+              name: 'counter-history',
+              storage: createJSONStorage<PersistedCounterHistory>(() => localStorage),
+              partialize: (history) => ({
+                futureStates: history.futureStates,
+                pastStates: history.pastStates,
+              }),
+            }),
+          )
+          .create(temporalCreator),
+    }),
+  )
+  .create((set) => ({ ... }))
+```
+
+外側の `pipe` は main store を合成し、内側の `pipe` は zundo の temporal history store を合成します。
 
 ### `combine` と `redux`
 
@@ -251,9 +316,10 @@ pipe
 - **すでに動いている store を書き直さないでください。**
 - **Bundler resolution を前提とします。** この package は extensionless な内部相対 import を持つ ESM として emit されるため、bundler-compatible toolchain 経由で使用してください。
 - **built-in wrapper の順序と重複は強制されます。** package が提供する wrapper は outer-to-inner の順で追加してください: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. TypeScript と runtime の `.use(...)` 境界は、逆順の built-in wrapper と重複した package built-in を拒否します。
-- **runtime guard は tag 付きの package built-in に限定されます。** この package の `devtools`, `subscribeWithSelector`, `persist`, `immer` adapter が返す wrapper だけを検査します。任意の untagged、userland、third-party middleware の順序や重複は introspect しません。
+- **runtime guard は tag 付きの pipeable wrapper に限定されます。** package built-in (`devtools`, `subscribeWithSelector`, `persist`, `immer`) と `zundo` のような opt-in adapter は、重複/順序検査用の明示的な metadata を持ちます。任意の untagged、userland、third-party middleware の順序や重複は introspect しません。
 - **Userland order metadata は opt-in です。** `definePipeableMiddleware` は明示的な id と `order.before` / `order.after` hint だけを信頼します。関数名や source code は introspect せず、任意の third-party middleware を自動的に安全にするものではありません。
 - **直接 reexport は Zustand helper の意味を保ちます。** `combine`, `redux`, `createJSONStorage` は直接の Zustand helper です。`combine` と `redux` は `.use(...)` ではなく `.create(...)` の中に置き、`immer` は引き続き専用の `zustand-middleware-pipe/middleware/immer` subpath から使います。
+- **任意の third-party adapter は専用 subpath に置きます。** `zundo` は `zustand-middleware-pipe/middleware/zundo` から利用でき、consuming app 側で `zundo` のインストールが必要です。
 - **`store.devtools` の可用性**は通常の Zustand devtools の動作に依存します。devtools が無効化されているか Redux DevTools extension がない場合は、利用できないことがあります。
 - **サードパーティ middleware** は自動的には合成できません。builder と連携するには、wrapper に正しい mutator tuple 型が必要です。
 

@@ -36,6 +36,7 @@ const packageJson = JSON.parse(await readText('../package.json'))
 const indexJs = await readText('../dist/index.js')
 const middlewareJs = await readText('../dist/middleware.js')
 const immerJs = await readText('../dist/middleware/immer.js')
+const zundoJs = await readText('../dist/middleware/zundo.js')
 
 async function readRuntimeKeys(specifier) {
   const loaderPath = await createExtensionlessLoader()
@@ -72,6 +73,10 @@ assert.deepEqual(packageJson.exports, {
     types: './dist/middleware/immer.d.ts',
     import: './dist/middleware/immer.js',
   },
+  './middleware/zundo': {
+    types: './dist/middleware/zundo.d.ts',
+    import: './dist/middleware/zundo.js',
+  },
 })
 
 assert.match(indexJs, /export \{ pipe \} from ['"]\.\/pipe['"];/)
@@ -93,6 +98,7 @@ assert.match(
   /export \{ subscribeWithSelector \} from ['"]\.\/middleware\/subscribe-with-selector['"];/,
 )
 assert.match(immerJs, /export function immer\(\)/)
+assert.match(zundoJs, /export function temporal\(/)
 
 for (const [path, content] of [
   ['dist/index.js', indexJs],
@@ -107,6 +113,7 @@ for (const [path, content] of [
 
 const rootRuntimeKeys = await readRuntimeKeys('./dist/index.js')
 const middlewareRuntimeKeys = await readRuntimeKeys('./dist/middleware.js')
+const zundoRuntimeKeys = await readRuntimeKeys('./dist/middleware/zundo.js')
 
 assert.deepEqual(rootRuntimeKeys, ['definePipeableMiddleware', 'pipe'])
 assert.deepEqual(middlewareRuntimeKeys, [
@@ -118,6 +125,7 @@ assert.deepEqual(middlewareRuntimeKeys, [
   'redux',
   'subscribeWithSelector',
 ])
+assert.deepEqual(zundoRuntimeKeys, ['temporal'])
 
 if (process.env.TASK14_ROOT_EXPORTS_PATH) {
   await writeFile(

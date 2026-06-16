@@ -38,6 +38,10 @@
     "./middleware/immer": {
       "types": "./dist/middleware/immer.d.ts",
       "import": "./dist/middleware/immer.js"
+    },
+    "./middleware/zundo": {
+      "types": "./dist/middleware/zundo.d.ts",
+      "import": "./dist/middleware/zundo.js"
     }
   },
   "types": "./dist/index.d.ts",
@@ -58,18 +62,24 @@
   },
   "peerDependencies": {
     "immer": ">=9.0.6",
+    "zundo": "^2.3.0",
     "zustand": "^5.0.0"
   },
   "peerDependenciesMeta": {
     "immer": {
+      "optional": true
+    },
+    "zundo": {
       "optional": true
     }
   },
   "devDependencies": {
     "@types/node": "^20.19.11",
     "immer": "^10.1.1",
+    "react": "^19.2.7",
     "typescript": "^5.9.3",
     "vitest": "^4.1.9",
+    "zundo": "^2.3.0",
     "zustand": "^5.0.8"
   }
 }
