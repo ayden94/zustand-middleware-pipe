@@ -16,7 +16,7 @@ npm install zustand-middleware-pipe zustand
 
 ```ts
 import { create } from 'zustand'
-import { pipe } from 'zustand-middleware-pipe'
+import { definePipeableMiddleware, pipe } from 'zustand-middleware-pipe'
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
 import { devtools, persist, subscribeWithSelector } from 'zustand-middleware-pipe/middleware'
 
@@ -219,6 +219,29 @@ const useReduxCounterStore = create<CounterState & { dispatch: Dispatch }>()(
 )
 ```
 
+### Userland middleware metadata
+
+`definePipeableMiddleware` tags a correctly typed userland middleware with an explicit id and optional policy metadata. The helper returns the same middleware function, so Zustand mutator tuple typing still comes from the middleware itself:
+
+```ts
+const temporal = definePipeableMiddleware(temporalMiddleware, {
+  id: 'zundo/temporal',
+  duplicate: 'reject',
+  order: {
+    after: ['zustand/persist'],
+    before: ['zustand/immer'],
+  },
+})
+
+pipe
+  .use(persist<CounterState>({ name: 'counter' }))
+  .use(temporal)
+  .use(immer())
+  .create((set) => ({ ... }))
+```
+
+`order.before` and `order.after` are checked only against ids that are present in the current pipe chain. Unknown or absent targets are ignored, cycles are rejected, and reserved built-in ids such as `zustand/persist` cannot be reused by public userland metadata.
+
 ---
 
 ## Important caveats
@@ -228,6 +251,7 @@ const useReduxCounterStore = create<CounterState & { dispatch: Dispatch }>()(
 - **Bundler resolution is expected.** The package is emitted as ESM with extensionless internal relative imports, so consume it through a bundler-compatible toolchain.
 - **Built-in wrapper order and duplicates are enforced.** Add package-provided wrappers outer-to-inner: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. TypeScript and the runtime `.use(...)` boundary reject reversed built-in order and duplicate package built-ins.
 - **Runtime guards are scoped to tagged package built-ins.** Only wrappers returned by this package's `devtools`, `subscribeWithSelector`, `persist`, and `immer` adapters are checked; arbitrary untagged, userland, or third-party middleware is not introspected for order or duplicates.
+- **Userland order metadata is opt-in.** `definePipeableMiddleware` only trusts explicit ids and `order.before` / `order.after` hints. It does not inspect function names or source code, and it does not make arbitrary third-party middleware automatically safe.
 - **Direct reexports keep Zustand helper semantics.** `combine`, `redux`, and `createJSONStorage` are direct Zustand helpers; `combine` and `redux` belong inside `.create(...)`, not `.use(...)`, and `immer` remains available from the dedicated `zustand-middleware-pipe/middleware/immer` subpath.
 - **`store.devtools` availability** depends on normal Zustand devtools behavior. It may not exist when devtools are disabled or the Redux DevTools extension is absent.
 - **Third-party middleware** is not automatically composable. Wrappers need correct mutator tuple types to work with the builder.

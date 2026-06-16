@@ -1,4 +1,5 @@
 export { combine } from './middleware/combine'
+export { definePipeableMiddleware } from './pipeable-middleware'
 export { devtools } from './middleware/devtools'
 export { persist } from './middleware/persist'
 export { redux } from './middleware/redux'
@@ -12,3 +13,9 @@ export type {
   StateStorage,
   StorageValue,
 } from 'zustand/middleware'
+export type {
+  PipeableMiddlewareMetadata,
+  PipeMiddlewareDuplicatePolicy,
+  PipeMiddlewareId,
+  PipeMiddlewareOrderMetadata,
+} from './types'

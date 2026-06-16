@@ -75,7 +75,15 @@ assert.deepEqual(packageJson.exports, {
 })
 
 assert.match(indexJs, /export \{ pipe \} from ['"]\.\/pipe['"];/)
+assert.match(
+  indexJs,
+  /export \{ definePipeableMiddleware \} from ['"]\.\/pipeable-middleware['"];/,
+)
 assert.match(middlewareJs, /export \{ combine \} from ['"]\.\/middleware\/combine['"];/)
+assert.match(
+  middlewareJs,
+  /export \{ definePipeableMiddleware \} from ['"]\.\/pipeable-middleware['"];/,
+)
 assert.match(middlewareJs, /export \{ createJSONStorage \} from ['"]zustand\/middleware['"];/)
 assert.match(middlewareJs, /export \{ devtools \} from ['"]\.\/middleware\/devtools['"];/)
 assert.match(middlewareJs, /export \{ persist \} from ['"]\.\/middleware\/persist['"];/)
@@ -100,10 +108,11 @@ for (const [path, content] of [
 const rootRuntimeKeys = await readRuntimeKeys('./dist/index.js')
 const middlewareRuntimeKeys = await readRuntimeKeys('./dist/middleware.js')
 
-assert.deepEqual(rootRuntimeKeys, ['pipe'])
+assert.deepEqual(rootRuntimeKeys, ['definePipeableMiddleware', 'pipe'])
 assert.deepEqual(middlewareRuntimeKeys, [
   'combine',
   'createJSONStorage',
+  'definePipeableMiddleware',
   'devtools',
   'persist',
   'redux',

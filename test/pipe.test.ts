@@ -3,11 +3,13 @@ import { createStore } from 'zustand/vanilla'
 import { createJSONStorage as officialCreateJSONStorage } from 'zustand/middleware'
 import * as publicApi from '../src/index'
 import {
+  definePipeableMiddleware,
   pipe,
   type DevtoolsMutator,
   type ImmerMutator,
   type PersistMutator,
   type Pipe,
+  type PipeableMiddlewareMetadata,
   type PipeMiddleware,
   type SubscribeWithSelectorMutator,
 } from '../src/index'
@@ -117,6 +119,17 @@ function createOrderMarkerMiddleware<T>(
     events.push(`${name}:after`)
     return state
   }
+}
+
+function createPipeableOrderMarkerMiddleware<T>(
+  name: string,
+  events: string[],
+  metadata: PipeableMiddlewareMetadata,
+): PipeMiddleware<T, [], []> {
+  return definePipeableMiddleware(
+    createOrderMarkerMiddleware<T>(name, events),
+    metadata,
+  )
 }
 
 function captureUseError(builder: unknown, middleware: unknown): unknown {
@@ -424,8 +437,10 @@ describe('pipe', () => {
 
   it('exports the intended root runtime helpers', () => {
     expect(Object.keys(publicApi).sort()).toEqual([
+      'definePipeableMiddleware',
       'pipe',
     ])
+    expect(typeof definePipeableMiddleware).toBe('function')
     expect(Object.keys(pipe).sort()).toEqual([
       'use',
     ])
@@ -461,6 +476,7 @@ describe('pipe', () => {
     expect(typeof middleware.redux).toBe('function')
     expect(typeof middleware.subscribeWithSelector).toBe('function')
     expect(typeof middleware.devtools).toBe('function')
+    expect(typeof middleware.definePipeableMiddleware).toBe('function')
   })
 
   it('exports Immer from the dedicated middleware subpath', () => {
@@ -761,6 +777,174 @@ describe('pipe', () => {
       'marker:after',
       'marker:after',
     ])
+  })
+
+  it('honors pipeable middleware order metadata for tagged userland middleware', () => {
+    const events: string[] = []
+    const outer = createPipeableOrderMarkerMiddleware<{ count: number }>(
+      'outer',
+      events,
+      {
+        id: 'test/outer',
+        order: { before: ['test/inner'] },
+      },
+    )
+    const inner = createPipeableOrderMarkerMiddleware<{ count: number }>(
+      'inner',
+      events,
+      {
+        id: 'test/inner',
+        order: { after: ['test/outer'] },
+      },
+    )
+
+    const store = createStore<{ count: number }>()(
+      pipe.use(outer).use(inner).create(() => ({ count: 0 })),
+    )
+
+    expect(store.getState().count).toBe(0)
+    expect(events).toEqual([
+      'outer:before',
+      'inner:before',
+      'inner:after',
+      'outer:after',
+    ])
+  })
+
+  it('ignores pipeable order targets that are not present in the chain', () => {
+    const events: string[] = []
+    const marker = createPipeableOrderMarkerMiddleware<{ count: number }>(
+      'marker',
+      events,
+      {
+        id: 'test/missing-target-marker',
+        order: {
+          after: ['test/not-present-before'],
+          before: ['test/not-present-after'],
+        },
+      },
+    )
+
+    const store = createStore<{ count: number }>()(
+      pipe.use(marker).create(() => ({ count: 0 })),
+    )
+
+    expect(store.getState().count).toBe(0)
+    expect(events).toEqual(['marker:before', 'marker:after'])
+  })
+
+  it('rejects duplicate pipeable middleware ids unless explicitly allowed', () => {
+    const first = createPipeableOrderMarkerMiddleware<{ count: number }>(
+      'first',
+      [],
+      { id: 'test/duplicate' },
+    )
+    const second = createPipeableOrderMarkerMiddleware<{ count: number }>(
+      'second',
+      [],
+      { id: 'test/duplicate' },
+    )
+    const thrown = captureUseError(pipe.use(first), second)
+
+    expect(thrown).toBeInstanceOf(TypeError)
+
+    if (!(thrown instanceof Error)) {
+      throw new Error('Expected duplicate pipeable middleware to throw')
+    }
+
+    expect(thrown.message).toContain('test/duplicate')
+    expect(thrown.message).toContain('cannot be added more than once')
+  })
+
+  it('allows duplicate pipeable middleware ids with duplicate allow policy', () => {
+    const events: string[] = []
+    const first = createPipeableOrderMarkerMiddleware<{ count: number }>(
+      'first',
+      events,
+      { id: 'test/repeatable', duplicate: 'allow' },
+    )
+    const second = createPipeableOrderMarkerMiddleware<{ count: number }>(
+      'second',
+      events,
+      { id: 'test/repeatable', duplicate: 'allow' },
+    )
+
+    const store = createStore<{ count: number }>()(
+      pipe.use(first).use(second).create(() => ({ count: 0 })),
+    )
+
+    expect(store.getState().count).toBe(0)
+    expect(events).toEqual([
+      'first:before',
+      'second:before',
+      'second:after',
+      'first:after',
+    ])
+  })
+
+  it('rejects pipeable middleware order violations at .use(...) time', () => {
+    const outer = createPipeableOrderMarkerMiddleware<{ count: number }>(
+      'outer',
+      [],
+      { id: 'test/order-outer' },
+    )
+    const inner = createPipeableOrderMarkerMiddleware<{ count: number }>(
+      'inner',
+      [],
+      {
+        id: 'test/order-inner',
+        order: { after: ['test/order-outer'] },
+      },
+    )
+    const thrown = captureUseError(pipe.use(inner), outer)
+
+    expect(thrown).toBeInstanceOf(TypeError)
+
+    if (!(thrown instanceof Error)) {
+      throw new Error('Expected pipeable order violation to throw')
+    }
+
+    expect(thrown.message).toContain('test/order-outer')
+    expect(thrown.message).toContain('test/order-inner')
+    expect(thrown.message).toContain('must be added before')
+  })
+
+  it('rejects cyclic pipeable middleware order metadata', () => {
+    const first = createPipeableOrderMarkerMiddleware<{ count: number }>(
+      'first',
+      [],
+      {
+        id: 'test/cycle-first',
+        order: { after: ['test/cycle-second'] },
+      },
+    )
+    const second = createPipeableOrderMarkerMiddleware<{ count: number }>(
+      'second',
+      [],
+      {
+        id: 'test/cycle-second',
+        order: { after: ['test/cycle-first'] },
+      },
+    )
+    const thrown = captureUseError(pipe.use(first), second)
+
+    expect(thrown).toBeInstanceOf(TypeError)
+
+    if (!(thrown instanceof Error)) {
+      throw new Error('Expected pipeable cycle to throw')
+    }
+
+    expect(thrown.message).toContain('cycle')
+    expect(thrown.message).toContain('test/cycle-first')
+    expect(thrown.message).toContain('test/cycle-second')
+  })
+
+  it('rejects public pipeable metadata that conflicts with reserved built-in ids', () => {
+    const marker = createOrderMarkerMiddleware<{ count: number }>('marker', [])
+
+    expect(() =>
+      definePipeableMiddleware(marker, { id: 'zustand/persist' }),
+    ).toThrow('reserved built-in id')
   })
 
   it('rejects package built-in wrong order at .use(...) time', () => {

@@ -6,16 +6,13 @@ import type {
   MutatorTuple,
   PipeAnyMiddleware,
 } from '../types'
-import { tagBuiltInMiddleware } from '../middleware-metadata'
+import { defineBuiltInPipeableMiddleware } from '../middleware-metadata'
 
 export function immer(): PipeAnyMiddleware<
   [ImmerMutator],
   [ImmerMutator]
 > {
-  return tagBuiltInMiddleware(
-    <T, Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
-      initializer: StateCreator<T, [...Mps, ImmerMutator], Mcs>,
-    ) => zustandImmer(initializer),
-    'immer',
-  )
+  return defineBuiltInPipeableMiddleware(<T, Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
+    initializer: StateCreator<T, [...Mps, ImmerMutator], Mcs>,
+  ) => zustandImmer(initializer), 'immer')
 }

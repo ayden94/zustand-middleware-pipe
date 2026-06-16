@@ -5,7 +5,7 @@ This Vite app exercises the local `zustand-middleware-pipe` package with multipl
 It demonstrates the recommended middleware imports:
 
 ```ts
-import { pipe } from 'zustand-middleware-pipe'
+import { definePipeableMiddleware, pipe } from 'zustand-middleware-pipe'
 import {
   combine,
   createJSONStorage,

@@ -2,6 +2,21 @@ import type { StateCreator, StoreMutatorIdentifier } from 'zustand/vanilla'
 
 export type MutatorTuple = [StoreMutatorIdentifier, unknown][]
 
+export type PipeMiddlewareId = string
+
+export type PipeMiddlewareDuplicatePolicy = 'allow' | 'reject'
+
+export interface PipeMiddlewareOrderMetadata {
+  readonly before?: readonly PipeMiddlewareId[]
+  readonly after?: readonly PipeMiddlewareId[]
+}
+
+export interface PipeableMiddlewareMetadata {
+  readonly id: PipeMiddlewareId
+  readonly duplicate?: PipeMiddlewareDuplicatePolicy
+  readonly order?: PipeMiddlewareOrderMetadata
+}
+
 export type DevtoolsMutator = ['zustand/devtools', never]
 export type ImmerMutator = ['zustand/immer', never]
 export type PersistMutator<PersistedState = unknown> = [

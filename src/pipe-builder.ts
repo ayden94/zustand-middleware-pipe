@@ -1,7 +1,10 @@
 import type { StateCreator } from 'zustand/vanilla'
 import {
+  builtInMiddlewareIds,
   getBuiltInMiddlewareKind,
+  getPipeableMiddlewareMetadata,
   type BuiltInMiddlewareKind,
+  type PipeableMiddlewareRuntimeMetadata,
 } from './middleware-metadata'
 import type {
   MutatorTuple,
@@ -30,6 +33,17 @@ function createDuplicateBuiltInMiddlewareMessage(
   kind: BuiltInMiddlewareKind,
 ): string {
   return `Built-in pipe middleware cannot be added more than once: ${kind}`
+}
+
+function createDuplicatePipeableMiddlewareMessage(id: string): string {
+  return `Pipeable middleware cannot be added more than once: ${id}`
+}
+
+function createPipeableMiddlewareOrderMessage(
+  before: string,
+  after: string,
+): string {
+  return `Pipeable middleware order constraint violated: ${before} must be added before ${after}`
 }
 
 function getBuiltInMiddlewareOrderIndex(kind: BuiltInMiddlewareKind): number {
@@ -67,6 +81,130 @@ function assertBuiltInMiddlewareNotDuplicate(
   }
 }
 
+function assertPipeableMiddlewareNotDuplicate(
+  usedMetadata: readonly PipeableMiddlewareRuntimeMetadata[],
+  nextMetadata: PipeableMiddlewareRuntimeMetadata | undefined,
+): void {
+  if (nextMetadata === undefined || nextMetadata.duplicate === 'allow') {
+    return
+  }
+
+  if (usedMetadata.some((metadata) => metadata.id === nextMetadata.id)) {
+    throw new TypeError(createDuplicatePipeableMiddlewareMessage(nextMetadata.id))
+  }
+}
+
+type OrderEdge = {
+  readonly before: string
+  readonly after: string
+}
+
+function createPresentMiddlewareIds(
+  metadata: readonly PipeableMiddlewareRuntimeMetadata[],
+): Set<string> {
+  return new Set(metadata.map(({ id }) => id))
+}
+
+function createPipeableOrderEdges(
+  metadata: readonly PipeableMiddlewareRuntimeMetadata[],
+): OrderEdge[] {
+  const presentIds = createPresentMiddlewareIds(metadata)
+  const edges: OrderEdge[] = []
+
+  for (const item of metadata) {
+    for (const target of item.order?.before ?? []) {
+      if (presentIds.has(target)) {
+        edges.push({ before: item.id, after: target })
+      }
+    }
+
+    for (const target of item.order?.after ?? []) {
+      if (presentIds.has(target)) {
+        edges.push({ before: target, after: item.id })
+      }
+    }
+  }
+
+  for (const [beforeIndex, beforeKind] of builtInMiddlewareOrder.entries()) {
+    const before = builtInMiddlewareIds[beforeKind]
+
+    if (!presentIds.has(before)) {
+      continue
+    }
+
+    for (const afterKind of builtInMiddlewareOrder.slice(beforeIndex + 1)) {
+      const after = builtInMiddlewareIds[afterKind]
+
+      if (presentIds.has(after)) {
+        edges.push({ before, after })
+      }
+    }
+  }
+
+  return edges
+}
+
+function assertPipeableOrderHasNoCycle(edges: readonly OrderEdge[]): void {
+  const graph = new Map<string, string[]>()
+  const visiting = new Set<string>()
+  const visited = new Set<string>()
+
+  for (const { before, after } of edges) {
+    graph.set(before, [...(graph.get(before) ?? []), after])
+    graph.set(after, graph.get(after) ?? [])
+  }
+
+  function visit(id: string, path: readonly string[]): void {
+    if (visited.has(id)) {
+      return
+    }
+
+    if (visiting.has(id)) {
+      throw new TypeError(
+        `Pipeable middleware order metadata contains a cycle: ${[
+          ...path,
+          id,
+        ].join(' -> ')}`,
+      )
+    }
+
+    visiting.add(id)
+
+    for (const next of graph.get(id) ?? []) {
+      visit(next, [...path, id])
+    }
+
+    visiting.delete(id)
+    visited.add(id)
+  }
+
+  for (const id of graph.keys()) {
+    visit(id, [])
+  }
+}
+
+function assertPipeableMiddlewareOrder(
+  metadata: readonly PipeableMiddlewareRuntimeMetadata[],
+): void {
+  const edges = createPipeableOrderEdges(metadata)
+  const positions = new Map(metadata.map(({ id }, index) => [id, index]))
+
+  assertPipeableOrderHasNoCycle(edges)
+
+  for (const { before, after } of edges) {
+    const beforePosition = positions.get(before)
+    const afterPosition = positions.get(after)
+
+    if (
+      beforePosition !== undefined &&
+      afterPosition !== undefined &&
+      beforePosition > afterPosition
+    ) {
+      throw new TypeError(createPipeableMiddlewareOrderMessage(before, after))
+    }
+  }
+}
+
 function extendPipeBuilder<
   T,
   Required extends MutatorTuple,
@@ -76,6 +214,7 @@ function extendPipeBuilder<
 >(
   apply: PipeApply<T, Required, StoreMutators>,
   usedBuiltIns: readonly BuiltInMiddlewareKind[],
+  usedMetadata: readonly PipeableMiddlewareRuntimeMetadata[],
   middleware: PipeAnyMiddleware<Consumed, Produced> &
     PipeCompatibleAnyMiddleware<Required, Consumed, Produced> &
     PipeMiddlewareOrderGuard<StoreMutators, Produced>,
@@ -93,6 +232,7 @@ function extendPipeBuilder<
 >(
   apply: PipeApply<T, Required, StoreMutators>,
   usedBuiltIns: readonly BuiltInMiddlewareKind[],
+  usedMetadata: readonly PipeableMiddlewareRuntimeMetadata[],
   middleware: PipeMiddleware<T, Consumed, Produced> &
     PipeCompatibleMiddleware<T, Required, Consumed, Produced> &
     PipeMiddlewareOrderGuard<StoreMutators, Produced>,
@@ -110,6 +250,7 @@ function extendPipeBuilder<
 >(
   apply: PipeApply<T, Required, StoreMutators>,
   usedBuiltIns: readonly BuiltInMiddlewareKind[],
+  usedMetadata: readonly PipeableMiddlewareRuntimeMetadata[],
   middleware: PipeCompatibleAnyMiddleware<Required, Consumed, Produced> &
     PipeMiddlewareOrderGuard<StoreMutators, Produced>,
 ): PipeBuilder<
@@ -134,6 +275,7 @@ function extendPipeBuilder<
         middleware<NextT, Mps, Mcs>(initializer),
       ),
     usedBuiltIns,
+    usedMetadata,
   )
 }
 
@@ -144,6 +286,7 @@ function createPipeBuilder<
 >(
   apply: PipeApply<T, Required, StoreMutators>,
   usedBuiltIns: readonly BuiltInMiddlewareKind[] = [],
+  usedMetadata: readonly PipeableMiddlewareRuntimeMetadata[] = [],
 ): PipeBuilder<T, Required, StoreMutators> {
   return {
     use<Consumed extends MutatorTuple, Produced extends MutatorTuple>(
@@ -156,15 +299,21 @@ function createPipeBuilder<
       [...StoreMutators, ...Produced]
     > {
       const nextBuiltIn = getBuiltInMiddlewareKind(middleware)
+      const nextMetadata = getPipeableMiddlewareMetadata(middleware)
+      const nextUsedMetadata =
+        nextMetadata === undefined ? usedMetadata : [...usedMetadata, nextMetadata]
 
       assertBuiltInMiddlewareNotDuplicate(usedBuiltIns, nextBuiltIn)
       assertBuiltInMiddlewareOrder(usedBuiltIns, nextBuiltIn)
+      assertPipeableMiddlewareNotDuplicate(usedMetadata, nextMetadata)
+      assertPipeableMiddlewareOrder(nextUsedMetadata)
 
       return extendPipeBuilder(
         apply,
         nextBuiltIn === undefined
           ? usedBuiltIns
           : [...usedBuiltIns, nextBuiltIn],
+        nextUsedMetadata,
         middleware,
       )
     },
