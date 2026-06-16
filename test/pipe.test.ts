@@ -1,5 +1,4 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { createJSONStorage, type StateStorage } from 'zustand/middleware'
 import { createStore } from 'zustand/vanilla'
 import * as publicApi from '../src/index.js'
 import {
@@ -16,10 +15,12 @@ import * as middleware from '../src/middleware.js'
 import { immer } from '../src/middleware/immer.js'
 import {
   combine,
+  createJSONStorage,
   devtools,
   persist,
   redux,
   subscribeWithSelector,
+  type StateStorage,
 } from '../src/middleware.js'
 
 interface CounterState {
@@ -79,7 +80,6 @@ describe('pipe', () => {
 
   it('starts a typed builder from pipe.use', () => {
     const builder = pipe
-      .use(immer())
       .use(persist<CounterState, PersistedCounterState>({
         name: 'counter-builder',
         storage: createJSONStorage<PersistedCounterState>(() =>
@@ -87,6 +87,7 @@ describe('pipe', () => {
         ),
         partialize: (state) => ({ count: state.count }),
       }))
+      .use(immer())
 
     expect(typeof pipe.use).toBe('function')
     expect(typeof builder.use).toBe('function')
@@ -96,6 +97,7 @@ describe('pipe', () => {
   it('exports non-Immer wrappers from the middleware barrel', () => {
     expect('immer' in middleware).toBe(false)
     expect(typeof middleware.combine).toBe('function')
+    expect(typeof middleware.createJSONStorage).toBe('function')
     expect(typeof middleware.persist).toBe('function')
     expect(typeof middleware.redux).toBe('function')
     expect(typeof middleware.subscribeWithSelector).toBe('function')
@@ -109,7 +111,8 @@ describe('pipe', () => {
   it('builds a Zustand middleware stack while preserving store extensions', () => {
     const store = createStore<CounterState>()(
       pipe
-        .use(immer())
+        .use(devtools({ name: 'CounterStore', enabled: false }))
+        .use(subscribeWithSelector())
         .use(persist<CounterState, PersistedCounterState>({
           name: 'counter',
           storage: createJSONStorage<PersistedCounterState>(() =>
@@ -117,8 +120,7 @@ describe('pipe', () => {
           ),
           partialize: (state) => ({ count: state.count }),
         }))
-        .use(subscribeWithSelector())
-        .use(devtools({ name: 'CounterStore', enabled: false }))
+        .use(immer())
         .create((set) => ({
           count: 0,
           label: 'counter',
@@ -210,13 +212,13 @@ describe('pipe', () => {
     expectTypeOf<typeof store.devtools.cleanup>().toEqualTypeOf<() => void>()
   })
 
-  it('preserves use order with later middleware wrapping earlier middleware', () => {
+  it('preserves use order with earlier middleware wrapping later middleware', () => {
     const events: string[] = []
 
     const store = createStore<{ count: number }>()(
       pipe
-        .use(createOrderMarkerMiddleware<{ count: number }>('inner', events))
         .use(createOrderMarkerMiddleware<{ count: number }>('outer', events))
+        .use(createOrderMarkerMiddleware<{ count: number }>('inner', events))
         .create(() => ({ count: 0 })),
     )
 
@@ -235,15 +237,17 @@ describe('pipe', () => {
         [DevtoolsMutator, SubscribeWithSelectorMutator, PersistMutator],
         [ImmerMutator]
       >
-    >().toEqualTypeOf<false>()
+    >().toEqualTypeOf<true>()
     expectTypeOf<
       PipeCanUseMiddleware<[PersistMutator], [DevtoolsMutator]>
-    >().toEqualTypeOf<true>()
+    >().toEqualTypeOf<false>()
   })
 
   it('allows pipe creators without immer when the stack omits immer', () => {
     const store = createStore<CounterState>()(
       pipe
+        .use(devtools({ name: 'CounterStoreWithoutImmer', enabled: false }))
+        .use(subscribeWithSelector())
         .use(persist<CounterState, PersistedCounterState>({
           name: 'counter-without-immer',
           storage: createJSONStorage<PersistedCounterState>(() =>
@@ -251,8 +255,6 @@ describe('pipe', () => {
           ),
           partialize: (state) => ({ count: state.count }),
         }))
-        .use(subscribeWithSelector())
-        .use(devtools({ name: 'CounterStoreWithoutImmer', enabled: false }))
         .create((set) => ({
           count: 0,
           label: 'counter',

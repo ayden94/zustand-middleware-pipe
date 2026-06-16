@@ -22,10 +22,10 @@ import { devtools, persist, subscribeWithSelector } from 'zustand-middleware-pip
 
 const useCounterStore = create<CounterState>()(
   pipe
-    .use(immer())
-    .use(persist<CounterState>({ name: 'counter' }))
-    .use(subscribeWithSelector())
     .use(devtools({ name: 'CounterStore' }))
+    .use(subscribeWithSelector())
+    .use(persist<CounterState>({ name: 'counter' }))
+    .use(immer())
     .create((set) => ({
       count: 0,
       inc: () => set((state) => { state.count += 1 }, false, 'counter/inc'),
@@ -41,11 +41,10 @@ const useCounterStore = create<CounterState>()(
 
 ## 問題: middleware stack は逆向きに読まされる
 
-Zustand の middleware は inside-out に書きます。最も内側の呼び出しが base creator で、最も外側の呼び出しが runtime で最後に適用される middleware です。4 つの middleware が積まれると、形が反転します:
+Zustand の middleware は base creator を包むネストした wrapper として書きます。最も外側の wrapper は見えやすい一方、base creator は最も深い場所に埋まります。4 つの middleware が積まれると、options と state logic が複数のインデント階層に散らばります:
 
 ```ts
-// runtime 順序: immer → persist → subscribeWithSelector → devtools
-// 記述順序:     devtools(subscribeWithSelector(persist(immer(...)))) ← 逆向き
+// wrapper 順序: devtools → subscribeWithSelector → persist → immer → base creator
 const useCounterStore = create<CounterState>()(
   devtools(
     subscribeWithSelector(
@@ -66,15 +65,15 @@ options は散らばります。`persist` の options は中間に埋まり、`d
 
 ## 解決: スタックを pipeline として書く
 
-`pipe` を使うと、同じ runtime 順序を左から右へ書けます:
+`pipe` を使うと、同じ wrapper stack を上から下へ、base creator を最後に置いて書けます:
 
 ```ts
-// 記述順序 = runtime 順序 ↓
+// 記述順序 = ネストした wrapper 表現の順序 ↓
 pipe
-  .use(immer())
-  .use(persist<CounterState>({ name: 'counter' }))
-  .use(subscribeWithSelector())
   .use(devtools({ name: 'CounterStore' }))
+  .use(subscribeWithSelector())
+  .use(persist<CounterState>({ name: 'counter' }))
+  .use(immer())
   .create((set) => ({ ... }))
 ```
 
@@ -82,10 +81,10 @@ pipe
 
 | | Before (inside-out) | After (pipe) |
 |---|---|---|
-| **読む順序** | 外側の wrapper から、base creator が最後 | 適用順そのまま左から右 |
+| **読む順序** | 外側の wrapper から、base creator は最深部に埋まる | 上から下へ読み、`.create(...)` で終わる |
 | **options の位置** | ネストの各レベルに散在 | 各 `.use(...)` 呼び出しにインライン |
 | **`set` 型** | ネスト構造から推論 | builder chain が積み上げて計算 |
-| **middleware 追加** | 式全体を再度ラップ | 正しい位置に `.use(...)` を追加 |
+| **middleware 追加** | 式全体を再度ラップ | 対応する wrapper 位置に `.use(...)` を挿入 |
 
 評価結果は同一です:
 
@@ -115,10 +114,10 @@ npm install immer
 ## API
 
 ```ts
-pipe.use(immer())
-  .use(persist<T, PersistedState>(options))
+pipe.use(devtools(options?))
   .use(subscribeWithSelector())
-  .use(devtools(options?))
+  .use(persist<T, PersistedState>(options))
+  .use(immer())
   .create(baseCreator)
 ```
 
@@ -135,7 +134,7 @@ redux(reducer, initialState)     // .create() の中で使用
 
 ### import パス
 
-Immer 以外の wrapper は middleware barrel から import します。Immer は optional peer として保持するため専用 subpath を使います:
+Immer 以外の wrapper と storage helper は middleware barrel から import します。Immer は optional peer として保持するため専用 subpath を使います:
 
 ```ts
 import { create } from 'zustand'
@@ -145,6 +144,7 @@ import { immer } from 'zustand-middleware-pipe/middleware/immer'
 
 import {
   combine,
+  createJSONStorage,
   devtools,
   persist,
   redux,
@@ -165,8 +165,8 @@ import {
 ```ts
 create<CounterState>()(
   pipe
-    // .use(immer()) ← この行を削除すると下の draft mutation が TypeScript エラーになります
     .use(persist<CounterState>({ name: 'counter' }))
+    // .use(immer()) ← この行を削除すると下の draft mutation が TypeScript エラーになります
     .create((set) => ({
       count: 0,
       inc: () =>
@@ -183,12 +183,12 @@ create<CounterState>()(
 
 ```ts
 pipe
+  .use(devtools({ name: 'CounterStore' }))
+  .use(subscribeWithSelector())
   .use(persist<CounterState, Pick<CounterState, 'count'>>({
     name: 'counter',
     partialize: (state) => ({ count: state.count }),
   }))
-  .use(subscribeWithSelector())
-  .use(devtools({ name: 'CounterStore' }))
   .create((set) => ({
     count: 0,
     inc: () => set((state) => ({ count: state.count + 1 }), false, 'counter/inc'),
@@ -226,7 +226,7 @@ const useReduxCounterStore = create<CounterState & { dispatch: Dispatch }>()(
 
 - **公式 Zustand guidance ではありません。** これは userland の実験です。
 - **すでに動いている store を書き直さないでください。**
-- **built-in wrapper の順序は強制されます。** inner-to-outer の順で追加してください: `.use(immer())` → `.use(persist(...))` → `.use(subscribeWithSelector())` → `.use(devtools(...))`. 逆順の built-in wrapper は `.use(...)` で拒否されます。
+- **built-in wrapper の順序は強制されます。** outer-to-inner の順で追加してください: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. 逆順の built-in wrapper は `.use(...)` で拒否されます。
 - **`store.devtools` の可用性**は通常の Zustand devtools の動作に依存します。devtools が無効化されているか Redux DevTools extension がない場合は、利用できないことがあります。
 - **サードパーティ middleware** は自動的には合成できません。builder と連携するには、wrapper に正しい mutator tuple 型が必要です。
 

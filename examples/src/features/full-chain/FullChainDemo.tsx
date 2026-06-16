@@ -29,9 +29,9 @@ export function FullChainDemo() {
       titleId="full-stack-title"
       description={
         <>
-          <code>immer</code>, <code>persist</code>,{' '}
-          <code>subscribeWithSelector</code>, <code>devtools</code>를 모두
-          <code>.use(...)</code>로 조합합니다.
+          <code>devtools</code>, <code>subscribeWithSelector</code>,{' '}
+          <code>persist</code>, <code>immer</code>를 모두 <code>.use(...)</code>로
+          조합합니다.
         </>
       }
     >
@@ -53,20 +53,20 @@ export function FullChainDemo() {
 
       <dl className="checks">
         <div>
-          <dt>.use(immer())</dt>
-          <dd>action 내부에서 draft mutation으로 count를 변경합니다.</dd>
-        </div>
-        <div>
-          <dt>.use(persist())</dt>
-          <dd>새로고침 후에도 count와 label이 유지됩니다.</dd>
+          <dt>.use(devtools())</dt>
+          <dd>Redux DevTools가 있으면 action 이름이 표시됩니다.</dd>
         </div>
         <div>
           <dt>.use(subscribeWithSelector())</dt>
           <dd>selector subscribe 결과: {lastChange}</dd>
         </div>
         <div>
-          <dt>.use(devtools())</dt>
-          <dd>Redux DevTools가 있으면 action 이름이 표시됩니다.</dd>
+          <dt>.use(persist())</dt>
+          <dd>새로고침 후에도 count와 label이 유지됩니다.</dd>
+        </div>
+        <div>
+          <dt>.use(immer())</dt>
+          <dd>action 내부에서 draft mutation으로 count를 변경합니다.</dd>
         </div>
       </dl>
     </DemoCard>

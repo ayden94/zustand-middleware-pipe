@@ -22,10 +22,10 @@ import { devtools, persist, subscribeWithSelector } from 'zustand-middleware-pip
 
 const useCounterStore = create<CounterState>()(
   pipe
-    .use(immer())
-    .use(persist<CounterState>({ name: 'counter' }))
-    .use(subscribeWithSelector())
     .use(devtools({ name: 'CounterStore' }))
+    .use(subscribeWithSelector())
+    .use(persist<CounterState>({ name: 'counter' }))
+    .use(immer())
     .create((set) => ({
       count: 0,
       inc: () => set((state) => { state.count += 1 }, false, 'counter/inc'),
@@ -41,11 +41,10 @@ const useCounterStore = create<CounterState>()(
 
 ## 문제: 미들웨어 스택은 거꾸로 읽힙니다
 
-Zustand 미들웨어는 inside-out으로 작성합니다. 가장 안쪽 호출이 base creator이고, 가장 바깥쪽 호출이 런타임에서 마지막으로 적용되는 미들웨어입니다. 미들웨어가 네 개 쌓이면, 형태가 뒤집힙니다:
+Zustand 미들웨어는 base creator를 감싸는 중첩 wrapper로 작성합니다. 가장 바깥쪽 wrapper는 잘 보이지만, base creator는 가장 깊은 곳에 묻힙니다. 미들웨어가 네 개 쌓이면 옵션과 상태 로직이 여러 들여쓰기 레벨에 흩어집니다:
 
 ```ts
-// 런타임 순서: immer → persist → subscribeWithSelector → devtools
-// 작성 순서:   devtools(subscribeWithSelector(persist(immer(...)))) ← 거꾸로
+// wrapper 순서: devtools → subscribeWithSelector → persist → immer → base creator
 const useCounterStore = create<CounterState>()(
   devtools(
     subscribeWithSelector(
@@ -66,15 +65,15 @@ const useCounterStore = create<CounterState>()(
 
 ## 해결: 스택을 pipeline처럼 작성하기
 
-`pipe`를 쓰면 같은 런타임 순서를 왼쪽에서 오른쪽으로 작성할 수 있습니다:
+`pipe`를 쓰면 같은 wrapper stack을 위에서 아래로, base creator를 마지막에 두고 작성할 수 있습니다:
 
 ```ts
-// 작성 순서 = 런타임 순서 ↓
+// 작성 순서 = 중첩 wrapper 표현식 순서 ↓
 pipe
-  .use(immer())
-  .use(persist<CounterState>({ name: 'counter' }))
-  .use(subscribeWithSelector())
   .use(devtools({ name: 'CounterStore' }))
+  .use(subscribeWithSelector())
+  .use(persist<CounterState>({ name: 'counter' }))
+  .use(immer())
   .create((set) => ({ ... }))
 ```
 
@@ -82,10 +81,10 @@ pipe
 
 | | Before (inside-out) | After (pipe) |
 |---|---|---|
-| **읽는 순서** | 바깥쪽 wrapper부터, base creator가 마지막 | 적용 순서 그대로 왼쪽에서 오른쪽 |
+| **읽는 순서** | 바깥쪽 wrapper부터, base creator는 가장 깊이 묻힘 | 위에서 아래로 읽고 `.create(...)`에서 끝남 |
 | **옵션 위치** | 중첩 레이어 곳곳에 흩어짐 | 각 `.use(...)` 호출 안에 인라인 |
 | **`set` 타입** | 중첩 구조에서 추론 | builder chain이 누적하여 계산 |
-| **미들웨어 추가** | 전체 표현식을 다시 감쌈 | 올바른 위치에 `.use(...)` 추가 |
+| **미들웨어 추가** | 전체 표현식을 다시 감쌈 | 대응되는 wrapper 위치에 `.use(...)` 삽입 |
 
 평가 결과는 동일합니다:
 
@@ -115,10 +114,10 @@ npm install immer
 ## API
 
 ```ts
-pipe.use(immer())
-  .use(persist<T, PersistedState>(options))
+pipe.use(devtools(options?))
   .use(subscribeWithSelector())
-  .use(devtools(options?))
+  .use(persist<T, PersistedState>(options))
+  .use(immer())
   .create(baseCreator)
 ```
 
@@ -135,7 +134,7 @@ redux(reducer, initialState)     // .create() 안에서 사용
 
 ### import 경로
 
-Immer를 제외한 wrapper는 middleware barrel에서 import합니다. Immer는 optional peer로 유지하기 위해 전용 subpath를 사용합니다:
+Immer를 제외한 wrapper와 storage helper는 middleware barrel에서 import합니다. Immer는 optional peer로 유지하기 위해 전용 subpath를 사용합니다:
 
 ```ts
 import { pipe } from 'zustand-middleware-pipe'
@@ -144,6 +143,7 @@ import { immer } from 'zustand-middleware-pipe/middleware/immer'
 
 import {
   combine,
+  createJSONStorage,
   devtools,
   persist,
   redux,
@@ -164,8 +164,8 @@ import {
 ```ts
 create<CounterState>()(
   pipe
-    // .use(immer()) ← 이 줄을 제거하면 아래 draft mutation이 TypeScript 에러
     .use(persist<CounterState>({ name: 'counter' }))
+    // .use(immer()) ← 이 줄을 제거하면 아래 draft mutation이 TypeScript 에러
     .create((set) => ({
       count: 0,
       inc: () =>
@@ -182,12 +182,12 @@ create<CounterState>()(
 
 ```ts
 pipe
+  .use(devtools({ name: 'CounterStore' }))
+  .use(subscribeWithSelector())
   .use(persist<CounterState, Pick<CounterState, 'count'>>({
     name: 'counter',
     partialize: (state) => ({ count: state.count }),
   }))
-  .use(subscribeWithSelector())
-  .use(devtools({ name: 'CounterStore' }))
   .create((set) => ({
     count: 0,
     inc: () => set((state) => ({ count: state.count + 1 }), false, 'counter/inc'),
@@ -225,7 +225,7 @@ const useReduxCounterStore = create<CounterState & { dispatch: Dispatch }>()(
 
 - **공식 Zustand guidance가 아닙니다.** 이것은 userland 실험입니다.
 - **이미 잘 동작하는 store는 다시 작성하지 마세요.**
-- **built-in wrapper 순서는 강제됩니다.** inner-to-outer 순서로 추가해야 합니다: `.use(immer())` → `.use(persist(...))` → `.use(subscribeWithSelector())` → `.use(devtools(...))`. 뒤집힌 built-in 순서는 `.use(...)`에서 거부됩니다.
+- **built-in wrapper 순서는 강제됩니다.** outer-to-inner 순서로 추가해야 합니다: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. 뒤집힌 built-in 순서는 `.use(...)`에서 거부됩니다.
 - **`store.devtools` 가용성**은 일반적인 Zustand devtools 동작에 의존합니다. devtools가 비활성화되어 있거나 Redux DevTools extension이 없다면 사용할 수 없을 수 있습니다.
 - **서드파티 미들웨어**는 자동으로 조합되지 않습니다. builder와 함께 동작하려면 wrapper에 올바른 mutator tuple 타입이 필요합니다.
 

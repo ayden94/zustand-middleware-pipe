@@ -27,26 +27,26 @@ type PipeAllowedCurrentMutatorId<
     ? Exclude<PipeBuiltInMutatorId, DevtoolsMutator[0]>
     : Id extends PersistMutator[0]
       ? PersistMutator[0] | ImmerMutator[0]
-      : ImmerMutator[0]
+    : ImmerMutator[0]
 
-type PipeCanWrapCurrentMutator<
+type PipeCanBeInnerMutator<
   Current extends [StoreMutatorIdentifier, unknown],
   ProducedId extends PipeBuiltInMutatorId,
 > = Current[0] extends PipeBuiltInMutatorId
-  ? Current[0] extends PipeAllowedCurrentMutatorId<ProducedId>
+  ? ProducedId extends PipeAllowedCurrentMutatorId<Current[0]>
     ? true
     : false
   : true
 
-type PipeCanWrapCurrentStack<
+type PipeCanBeInnerStack<
   CurrentStoreMutators extends MutatorTuple,
   ProducedId extends PipeBuiltInMutatorId,
 > = CurrentStoreMutators extends [
   infer Current extends [StoreMutatorIdentifier, unknown],
   ...infer Rest extends MutatorTuple,
 ]
-  ? PipeCanWrapCurrentMutator<Current, ProducedId> extends true
-    ? PipeCanWrapCurrentStack<Rest, ProducedId>
+  ? PipeCanBeInnerMutator<Current, ProducedId> extends true
+    ? PipeCanBeInnerStack<Rest, ProducedId>
     : false
   : true
 
@@ -54,7 +54,7 @@ type PipeCanUseProducedMutator<
   CurrentStoreMutators extends MutatorTuple,
   Produced extends [StoreMutatorIdentifier, unknown],
 > = Produced[0] extends PipeBuiltInMutatorId
-  ? PipeCanWrapCurrentStack<CurrentStoreMutators, Produced[0]>
+  ? PipeCanBeInnerStack<CurrentStoreMutators, Produced[0]>
   : true
 
 export type PipeCanUseMiddleware<
@@ -78,7 +78,7 @@ export type PipeMiddlewareOrderGuard<
 > = PipeCanUseMiddleware<CurrentStoreMutators, Produced> extends true
   ? unknown
   : {
-      readonly __pipeMiddlewareOrderError: 'Built-in pipe middleware must be added from inner to outer: immer, persist, subscribeWithSelector, devtools'
+      readonly __pipeMiddlewareOrderError: 'Built-in pipe middleware must be added from outer to inner: devtools, subscribeWithSelector, persist, immer'
       readonly __pipeCurrentMutators: CurrentStoreMutators
       readonly __pipeProducedMutators: Produced
     }
@@ -100,28 +100,28 @@ export type PipeAnyMiddleware<
 
 export type PipeCompatibleMiddleware<
   T,
-  CurrentStoreMutators extends MutatorTuple,
+  CurrentRequiredMutators extends MutatorTuple,
   Consumed extends MutatorTuple,
   Produced extends MutatorTuple,
 > = <Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
   initializer: StateCreator<
     T,
-    [...Mps, ...Consumed],
-    [...CurrentStoreMutators, ...Mcs]
+    [...Mps, ...CurrentRequiredMutators, ...Consumed],
+    Mcs
   >,
-) => StateCreator<T, Mps, [...Produced, ...CurrentStoreMutators, ...Mcs]>
+) => StateCreator<T, [...Mps, ...CurrentRequiredMutators], [...Produced, ...Mcs]>
 
 export type PipeCompatibleAnyMiddleware<
-  CurrentStoreMutators extends MutatorTuple,
+  CurrentRequiredMutators extends MutatorTuple,
   Consumed extends MutatorTuple,
   Produced extends MutatorTuple,
 > = <T, Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
   initializer: StateCreator<
     T,
-    [...Mps, ...Consumed],
-    [...CurrentStoreMutators, ...Mcs]
+    [...Mps, ...CurrentRequiredMutators, ...Consumed],
+    Mcs
   >,
-) => StateCreator<T, Mps, [...Produced, ...CurrentStoreMutators, ...Mcs]>
+) => StateCreator<T, [...Mps, ...CurrentRequiredMutators], [...Produced, ...Mcs]>
 
 export type PipeApply<
   T,
@@ -132,8 +132,7 @@ export type PipeApply<
   Mps extends MutatorTuple = [],
   Mcs extends MutatorTuple = [],
 >(
-  initializer: StateCreator<NextT, [...Mps, ...Required], Mcs, NextT> &
-    PipeStateCompatibility<T, NextT>,
+  initializer: StateCreator<NextT, [...Mps, ...Required], Mcs, NextT>,
 ) => StateCreator<
   PipeResolvedState<T, NextT>,
   Mps,
@@ -158,12 +157,12 @@ export interface PipeBuilder<
 > {
   use<Consumed extends MutatorTuple, Produced extends MutatorTuple>(
     middleware: PipeAnyMiddleware<Consumed, Produced> &
-      PipeCompatibleAnyMiddleware<StoreMutators, Consumed, Produced> &
+      PipeCompatibleAnyMiddleware<Required, Consumed, Produced> &
       PipeMiddlewareOrderGuard<StoreMutators, Produced>,
   ): PipeBuilder<
     T,
-    [...Consumed, ...Required],
-    [...Produced, ...StoreMutators]
+    [...Required, ...Consumed],
+    [...StoreMutators, ...Produced]
   >
   use<
     NextT,
@@ -171,13 +170,13 @@ export interface PipeBuilder<
     Produced extends MutatorTuple,
   >(
     middleware: PipeMiddleware<NextT, Consumed, Produced> &
-      PipeCompatibleMiddleware<NextT, StoreMutators, Consumed, Produced> &
+      PipeCompatibleMiddleware<NextT, Required, Consumed, Produced> &
       PipeMiddlewareOrderGuard<StoreMutators, Produced> &
       PipeStateCompatibility<T, NextT>,
   ): PipeBuilder<
     PipeResolvedState<T, NextT>,
-    [...Consumed, ...Required],
-    [...Produced, ...StoreMutators]
+    [...Required, ...Consumed],
+    [...StoreMutators, ...Produced]
   >
   create<NextT = T, Mcs extends MutatorTuple = []>(
     initializer: StateCreator<NextT, Required, Mcs, NextT> &

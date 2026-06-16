@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 
-import { createJSONStorage } from 'zustand/middleware'
 import { createStore } from 'zustand/vanilla'
 
 import * as root from 'zustand-middleware-pipe'
@@ -24,6 +23,7 @@ function createMemoryStorage() {
 assert.deepEqual(Object.keys(root).sort(), ['pipe'])
 assert.deepEqual(Object.keys(middleware).sort(), [
   'combine',
+  'createJSONStorage',
   'devtools',
   'persist',
   'redux',
@@ -34,16 +34,16 @@ assert.deepEqual(Object.keys(immerModule).sort(), ['immer'])
 const observed = []
 const store = createStore()(
   root.pipe
-    .use(immerModule.immer())
+    .use(middleware.devtools({ name: 'PackageConsumerStore', enabled: false }))
+    .use(middleware.subscribeWithSelector())
     .use(
       middleware.persist({
         name: 'package-consumer-smoke-test',
-        storage: createJSONStorage(() => createMemoryStorage()),
+        storage: middleware.createJSONStorage(() => createMemoryStorage()),
         partialize: (state) => ({ count: state.count }),
       }),
     )
-    .use(middleware.subscribeWithSelector())
-    .use(middleware.devtools({ name: 'PackageConsumerStore', enabled: false }))
+    .use(immerModule.immer())
     .create((set) => ({
       count: 0,
       inc: () => {

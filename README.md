@@ -22,10 +22,10 @@ import { devtools, persist, subscribeWithSelector } from 'zustand-middleware-pip
 
 const useCounterStore = create<CounterState>()(
   pipe
-    .use(immer())
-    .use(persist<CounterState>({ name: 'counter' }))
-    .use(subscribeWithSelector())
     .use(devtools({ name: 'CounterStore' }))
+    .use(subscribeWithSelector())
+    .use(persist<CounterState>({ name: 'counter' }))
+    .use(immer())
     .create((set) => ({
       count: 0,
       inc: () => set((state) => { state.count += 1 }, false, 'counter/inc'),
@@ -41,11 +41,10 @@ This package is based on the idea discussed in [pmndrs/zustand#3449](https://git
 
 ## The problem: middleware stacks read backwards
 
-Zustand middleware is written inside-out. The innermost call is the base creator; the outermost call is the last middleware applied at runtime. Once you have four middleware in the stack, the shape inverts:
+Zustand middleware is written as nested wrappers around a base creator. The outermost wrapper is easy to see, but the base creator is buried at the deepest level. Once you have four middleware in the stack, options and state logic spread across several indentation levels:
 
 ```ts
-// runtime order: immer → persist → subscribeWithSelector → devtools
-// writing order: devtools(subscribeWithSelector(persist(immer(...)))) ← inside-out
+// wrapper order: devtools → subscribeWithSelector → persist → immer → base creator
 const useCounterStore = create<CounterState>()(
   devtools(
     subscribeWithSelector(
@@ -66,15 +65,15 @@ Options end up scattered: `persist` options are buried in the middle, `devtools`
 
 ## The fix: write the stack as a pipeline
 
-`pipe` lets the same runtime order be written left-to-right:
+`pipe` lets the same wrapper stack be written top-to-bottom, with the base creator last:
 
 ```ts
-// writing order matches runtime order ↓
+// writing order matches the nested wrapper expression ↓
 pipe
-  .use(immer())
-  .use(persist<CounterState>({ name: 'counter' }))
-  .use(subscribeWithSelector())
   .use(devtools({ name: 'CounterStore' }))
+  .use(subscribeWithSelector())
+  .use(persist<CounterState>({ name: 'counter' }))
+  .use(immer())
   .create((set) => ({ ... }))
 ```
 
@@ -82,10 +81,10 @@ pipe
 
 | | Before (inside-out) | After (pipe) |
 |---|---|---|
-| **Reading order** | Outermost wrapper first, base creator last | Left-to-right, exactly as applied |
+| **Reading order** | Outermost wrapper first, base creator buried deepest | Top-to-bottom, ending at `.create(...)` |
 | **Options location** | Scattered across nesting levels | Inline with each `.use(...)` call |
 | **`set` type** | Inferred by nesting | Accumulated by the builder chain |
-| **Adding middleware** | Wrap the whole expression again | Append `.use(...)` at the right position |
+| **Adding middleware** | Wrap the whole expression again | Insert `.use(...)` at the matching wrapper position |
 
 The evaluation result is identical:
 
@@ -115,10 +114,10 @@ This package is **ESM-only**.
 ## API
 
 ```ts
-pipe.use(immer())
-  .use(persist<T, PersistedState>(options))
+pipe.use(devtools(options?))
   .use(subscribeWithSelector())
-  .use(devtools(options?))
+  .use(persist<T, PersistedState>(options))
+  .use(immer())
   .create(baseCreator)
 ```
 
@@ -135,7 +134,7 @@ redux(reducer, initialState)     // use inside .create()
 
 ### Import paths
 
-Non-Immer wrappers come from the middleware barrel. Immer has its own subpath to keep it an optional peer:
+Non-Immer wrappers and storage helpers come from the middleware barrel. Immer has its own subpath to keep it an optional peer:
 
 ```ts
 import { pipe } from 'zustand-middleware-pipe'
@@ -144,6 +143,7 @@ import { immer } from 'zustand-middleware-pipe/middleware/immer'
 
 import {
   combine,
+  createJSONStorage,
   devtools,
   persist,
   redux,
@@ -164,8 +164,8 @@ Remove a `.use(...)` call, and the corresponding capability disappears from the 
 ```ts
 create<CounterState>()(
   pipe
-    // .use(immer()) ← remove this and the draft mutation below is a TypeScript error
     .use(persist<CounterState>({ name: 'counter' }))
+    // .use(immer()) ← remove this and the draft mutation below is a TypeScript error
     .create((set) => ({
       count: 0,
       inc: () =>
@@ -182,12 +182,12 @@ Pass the persisted-state type as a second generic when using `partialize`:
 
 ```ts
 pipe
+  .use(devtools({ name: 'CounterStore' }))
+  .use(subscribeWithSelector())
   .use(persist<CounterState, Pick<CounterState, 'count'>>({
     name: 'counter',
     partialize: (state) => ({ count: state.count }),
   }))
-  .use(subscribeWithSelector())
-  .use(devtools({ name: 'CounterStore' }))
   .create((set) => ({
     count: 0,
     inc: () => set((state) => ({ count: state.count + 1 }), false, 'counter/inc'),
@@ -225,7 +225,7 @@ const useReduxCounterStore = create<CounterState & { dispatch: Dispatch }>()(
 
 - **Not official Zustand guidance.** This is a userland experiment.
 - **Do not rewrite working stores** just to use this helper.
-- **Built-in wrapper order is enforced.** Add wrappers inner-to-outer: `.use(immer())` → `.use(persist(...))` → `.use(subscribeWithSelector())` → `.use(devtools(...))`. Reversed built-in order is rejected at `.use(...)`.
+- **Built-in wrapper order is enforced.** Add wrappers outer-to-inner: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. Reversed built-in order is rejected at `.use(...)`.
 - **`store.devtools` availability** depends on normal Zustand devtools behavior. It may not exist when devtools are disabled or the Redux DevTools extension is absent.
 - **Third-party middleware** is not automatically composable. Wrappers need correct mutator tuple types to work with the builder.
 

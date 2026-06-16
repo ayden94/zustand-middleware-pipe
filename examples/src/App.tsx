@@ -10,7 +10,7 @@ function App() {
         <p className="eyebrow">zustand-middleware-pipe</p>
         <h1 id="demo-title">pipe.use()와 terminal helper 예시</h1>
         <p className="description">
-          <code>pipe.use()</code>로 middleware를 왼쪽에서 오른쪽 순서로 조합하고,
+          <code>pipe.use()</code>로 middleware wrapper를 위에서 아래 순서로 조합하고,
           <code>combine</code>과 <code>redux</code>는 <code>.create(...)</code> 안에
           terminal state creator helper로 넣는 패턴을 함께 보여줍니다.
         </p>

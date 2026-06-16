@@ -8,6 +8,7 @@ It demonstrates the recommended middleware imports:
 import { pipe } from 'zustand-middleware-pipe'
 import {
   combine,
+  createJSONStorage,
   devtools,
   persist,
   redux,
@@ -18,7 +19,7 @@ import { immer } from 'zustand-middleware-pipe/middleware/immer'
 
 The page includes:
 
-- a full `.use(immer()).use(persist()).use(subscribeWithSelector()).use(devtools())` chain
+- a full `.use(devtools()).use(subscribeWithSelector()).use(persist()).use(immer())` chain
 - a `pipe.use(devtools()).create(combine(...))` terminal helper example
 - a `pipe.use(devtools()).create(redux(...))` terminal helper example
 

@@ -21,12 +21,12 @@ function extendPipeBuilder<
 >(
   apply: PipeApply<T, Required, StoreMutators>,
   middleware: PipeAnyMiddleware<Consumed, Produced> &
-    PipeCompatibleAnyMiddleware<StoreMutators, Consumed, Produced> &
+    PipeCompatibleAnyMiddleware<Required, Consumed, Produced> &
     PipeMiddlewareOrderGuard<StoreMutators, Produced>,
 ): PipeBuilder<
   T,
-  [...Consumed, ...Required],
-  [...Produced, ...StoreMutators]
+  [...Required, ...Consumed],
+  [...StoreMutators, ...Produced]
 >
 function extendPipeBuilder<
   T,
@@ -37,12 +37,12 @@ function extendPipeBuilder<
 >(
   apply: PipeApply<T, Required, StoreMutators>,
   middleware: PipeMiddleware<T, Consumed, Produced> &
-    PipeCompatibleMiddleware<T, StoreMutators, Consumed, Produced> &
+    PipeCompatibleMiddleware<T, Required, Consumed, Produced> &
     PipeMiddlewareOrderGuard<StoreMutators, Produced>,
 ): PipeBuilder<
   T,
-  [...Consumed, ...Required],
-  [...Produced, ...StoreMutators]
+  [...Required, ...Consumed],
+  [...StoreMutators, ...Produced]
 >
 function extendPipeBuilder<
   T,
@@ -52,12 +52,12 @@ function extendPipeBuilder<
   Produced extends MutatorTuple,
 >(
   apply: PipeApply<T, Required, StoreMutators>,
-  middleware: PipeCompatibleAnyMiddleware<StoreMutators, Consumed, Produced> &
+  middleware: PipeCompatibleAnyMiddleware<Required, Consumed, Produced> &
     PipeMiddlewareOrderGuard<StoreMutators, Produced>,
 ): PipeBuilder<
   T,
-  [...Consumed, ...Required],
-  [...Produced, ...StoreMutators]
+  [...Required, ...Consumed],
+  [...StoreMutators, ...Produced]
 > {
   return createPipeBuilder(
     <
@@ -67,14 +67,13 @@ function extendPipeBuilder<
     >(
       initializer: StateCreator<
         NextT,
-        [...Mps, ...Consumed, ...Required],
+        [...Mps, ...Required, ...Consumed],
         Mcs,
         NextT
-      > &
-        PipeStateCompatibility<T, NextT>,
+      >,
     ) =>
-      middleware(
-        apply<NextT, [...Mps, ...Consumed], Mcs>(initializer),
+      apply<NextT, Mps, [...Produced, ...Mcs]>(
+        middleware<NextT, Mps, Mcs>(initializer),
       ),
   )
 }
@@ -89,12 +88,12 @@ function createPipeBuilder<
   return {
     use<Consumed extends MutatorTuple, Produced extends MutatorTuple>(
       middleware: PipeMiddleware<T, Consumed, Produced> &
-        PipeCompatibleMiddleware<T, StoreMutators, Consumed, Produced> &
+        PipeCompatibleMiddleware<T, Required, Consumed, Produced> &
         PipeMiddlewareOrderGuard<StoreMutators, Produced>,
     ): PipeBuilder<
       T,
-      [...Consumed, ...Required],
-      [...Produced, ...StoreMutators]
+      [...Required, ...Consumed],
+      [...StoreMutators, ...Produced]
     > {
       return extendPipeBuilder(
         apply,

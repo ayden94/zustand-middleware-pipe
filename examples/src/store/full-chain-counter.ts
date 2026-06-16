@@ -1,12 +1,12 @@
 import { create } from 'zustand'
 import { pipe } from 'zustand-middleware-pipe'
 import {
+  createJSONStorage,
   devtools,
   persist,
   subscribeWithSelector,
 } from 'zustand-middleware-pipe/middleware'
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
-import { createJSONStorage } from 'zustand/middleware'
 
 export interface FullChainCounterState {
   count: number
@@ -25,14 +25,14 @@ const initialState = {
 } satisfies PersistedCounterState
 
 export const useFullChainCounterStore = create<FullChainCounterState>()(
-  pipe.use(immer())
+  pipe.use(devtools({ name: 'ZustandMiddlewarePipeDemo' }))
+    .use(subscribeWithSelector())
     .use(persist<FullChainCounterState, PersistedCounterState>({
       name: 'zustand-middleware-pipe-demo',
       storage: createJSONStorage<PersistedCounterState>(() => localStorage),
       partialize: (state) => ({ count: state.count, label: state.label }),
     }))
-    .use(subscribeWithSelector())
-    .use(devtools({ name: 'ZustandMiddlewarePipeDemo' }))
+    .use(immer())
     .create((set) => ({
       ...initialState,
       decrement: () => {
