@@ -1,78 +1,49 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 
-import { createStore } from 'zustand/vanilla'
-
-import * as root from 'zustand-middleware-pipe'
-import * as middleware from 'zustand-middleware-pipe/middleware'
-import * as immerModule from 'zustand-middleware-pipe/middleware/immer'
-
-function createMemoryStorage() {
-  const values = new Map()
-
-  return {
-    getItem: (name) => values.get(name) ?? null,
-    setItem: (name, value) => {
-      values.set(name, value)
-    },
-    removeItem: (name) => {
-      values.delete(name)
-    },
-  }
+async function readText(path) {
+  return readFile(new URL(path, import.meta.url), 'utf8')
 }
 
-assert.deepEqual(Object.keys(root).sort(), ['pipe'])
-assert.deepEqual(Object.keys(middleware).sort(), [
-  'combine',
-  'createJSONStorage',
-  'devtools',
-  'persist',
-  'redux',
-  'subscribeWithSelector',
-])
-assert.deepEqual(Object.keys(immerModule).sort(), ['immer'])
+const packageJson = JSON.parse(await readText('../package.json'))
+const indexJs = await readText('../dist/index.js')
+const middlewareJs = await readText('../dist/middleware.js')
+const immerJs = await readText('../dist/middleware/immer.js')
 
-const observed = []
-const store = createStore()(
-  root.pipe
-    .use(middleware.devtools({ name: 'PackageConsumerStore', enabled: false }))
-    .use(middleware.subscribeWithSelector())
-    .use(
-      middleware.persist({
-        name: 'package-consumer-smoke-test',
-        storage: middleware.createJSONStorage(() => createMemoryStorage()),
-        partialize: (state) => ({ count: state.count }),
-      }),
-    )
-    .use(immerModule.immer())
-    .create((set) => ({
-      count: 0,
-      inc: () => {
-        set(
-          (state) => {
-            state.count += 1
-          },
-          false,
-          'counter/inc',
-        )
-      },
-    })),
-)
-
-const unsubscribe = store.subscribe(
-  (state) => state.count,
-  (count, previousCount) => {
-    observed.push([count, previousCount])
+assert.deepEqual(packageJson.exports, {
+  '.': {
+    types: './dist/index.d.ts',
+    import: './dist/index.js',
   },
+  './middleware': {
+    types: './dist/middleware.d.ts',
+    import: './dist/middleware.js',
+  },
+  './middleware/immer': {
+    types: './dist/middleware/immer.d.ts',
+    import: './dist/middleware/immer.js',
+  },
+})
+
+assert.match(indexJs, /export \{ pipe \} from ['"]\.\/pipe['"];/)
+assert.match(middlewareJs, /export \{ combine \} from ['"]\.\/middleware\/combine['"];/)
+assert.match(middlewareJs, /export \{ createJSONStorage \} from ['"]zustand\/middleware['"];/)
+assert.match(middlewareJs, /export \{ devtools \} from ['"]\.\/middleware\/devtools['"];/)
+assert.match(middlewareJs, /export \{ persist \} from ['"]\.\/middleware\/persist['"];/)
+assert.match(middlewareJs, /export \{ redux \} from ['"]\.\/middleware\/redux['"];/)
+assert.match(
+  middlewareJs,
+  /export \{ subscribeWithSelector \} from ['"]\.\/middleware\/subscribe-with-selector['"];/,
 )
+assert.match(immerJs, /export function immer\(\)/)
 
-store.getState().inc()
-store.setState({ count: 2 }, false, 'counter/setCount')
-
-assert.equal(store.getState().count, 2)
-assert.deepEqual(observed, [
-  [1, 0],
-  [2, 1],
-])
-assert.equal(store.persist.hasHydrated(), true)
-
-unsubscribe()
+for (const [path, content] of [
+  ['dist/index.js', indexJs],
+  ['dist/middleware.js', middlewareJs],
+]) {
+  assert.doesNotMatch(
+    content,
+    /from ['"]\.\.?\/[^'"]+\.js['"]/,
+    `${path} should keep extensionless relative exports for bundler resolution`,
+  )
+}

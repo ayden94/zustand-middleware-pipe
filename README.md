@@ -107,7 +107,7 @@ Install `immer` only if your stack includes `immer()`:
 npm install immer
 ```
 
-This package is **ESM-only**.
+This package is **ESM-only** and assumes bundler-style module resolution for its internal relative imports.
 
 ---
 
@@ -225,6 +225,7 @@ const useReduxCounterStore = create<CounterState & { dispatch: Dispatch }>()(
 
 - **Not official Zustand guidance.** This is a userland experiment.
 - **Do not rewrite working stores** just to use this helper.
+- **Bundler resolution is expected.** The package is emitted as ESM with extensionless internal relative imports, so consume it through a bundler-compatible toolchain.
 - **Built-in wrapper order is enforced.** Add wrappers outer-to-inner: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. Reversed built-in order is rejected at `.use(...)`.
 - **`store.devtools` availability** depends on normal Zustand devtools behavior. It may not exist when devtools are disabled or the Redux DevTools extension is absent.
 - **Third-party middleware** is not automatically composable. Wrappers need correct mutator tuple types to work with the builder.

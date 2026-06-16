@@ -107,7 +107,7 @@ npm install zustand-middleware-pipe zustand
 npm install immer
 ```
 
-이 패키지는 **ESM-only**입니다.
+이 패키지는 **ESM-only**이며 내부 상대 import에는 bundler-style module resolution을 전제로 합니다.
 
 ---
 
@@ -225,6 +225,7 @@ const useReduxCounterStore = create<CounterState & { dispatch: Dispatch }>()(
 
 - **공식 Zustand guidance가 아닙니다.** 이것은 userland 실험입니다.
 - **이미 잘 동작하는 store는 다시 작성하지 마세요.**
+- **Bundler resolution을 전제로 합니다.** 이 패키지는 extensionless 내부 상대 import를 가진 ESM으로 emit되므로, bundler-compatible toolchain을 통해 사용하세요.
 - **built-in wrapper 순서는 강제됩니다.** outer-to-inner 순서로 추가해야 합니다: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. 뒤집힌 built-in 순서는 `.use(...)`에서 거부됩니다.
 - **`store.devtools` 가용성**은 일반적인 Zustand devtools 동작에 의존합니다. devtools가 비활성화되어 있거나 Redux DevTools extension이 없다면 사용할 수 없을 수 있습니다.
 - **서드파티 미들웨어**는 자동으로 조합되지 않습니다. builder와 함께 동작하려면 wrapper에 올바른 mutator tuple 타입이 필요합니다.

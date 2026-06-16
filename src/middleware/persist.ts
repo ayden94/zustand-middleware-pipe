@@ -5,7 +5,7 @@ import type {
   MutatorTuple,
   PersistMutator,
   PipeMiddleware,
-} from '../types.js'
+} from '../types'
 
 export function persist<
   T,

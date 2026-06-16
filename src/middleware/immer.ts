@@ -5,7 +5,7 @@ import type {
   ImmerMutator,
   MutatorTuple,
   PipeAnyMiddleware,
-} from '../types.js'
+} from '../types'
 
 export function immer(): PipeAnyMiddleware<
   [ImmerMutator],

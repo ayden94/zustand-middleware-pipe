@@ -5,7 +5,7 @@ import type {
   MutatorTuple,
   PipeAnyMiddleware,
   SubscribeWithSelectorMutator,
-} from '../types.js'
+} from '../types'
 
 export function subscribeWithSelector(): PipeAnyMiddleware<
   [SubscribeWithSelectorMutator],

@@ -10,7 +10,7 @@ import type {
   PipeMiddleware,
   PipeResolvedState,
   PipeStateCompatibility,
-} from './types.js'
+} from './types'
 
 function extendPipeBuilder<
   T,

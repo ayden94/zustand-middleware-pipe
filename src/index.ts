@@ -1,5 +1,4 @@
-export { pipe } from './pipe.js'
-export type { Pipe } from './pipe.js'
+export { pipe, type Pipe } from './pipe'
 export type {
   DevtoolsMutator,
   ImmerMutator,
@@ -8,5 +7,6 @@ export type {
   PipeAnyMiddleware,
   PipeBuilder,
   PipeMiddleware,
-  SubscribeWithSelectorMutator,
-} from './types.js'
+  SubscribeWithSelectorMutator
+} from './types'
+

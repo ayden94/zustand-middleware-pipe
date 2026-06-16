@@ -5,7 +5,7 @@ import type {
   DevtoolsMutator,
   MutatorTuple,
   PipeAnyMiddleware,
-} from '../types.js'
+} from '../types'
 
 export function devtools(
   options?: DevtoolsOptions,

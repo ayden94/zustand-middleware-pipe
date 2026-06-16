@@ -1,5 +1,5 @@
-import { createInitialPipeBuilder } from './pipe-builder.js'
-import type { PipeBuilder } from './types.js'
+import { createInitialPipeBuilder } from './pipe-builder'
+import type { PipeBuilder } from './types'
 
 export interface Pipe {
   readonly use: PipeBuilder<unknown>['use']

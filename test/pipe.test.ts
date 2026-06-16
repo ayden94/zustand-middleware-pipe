@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createStore } from 'zustand/vanilla'
-import * as publicApi from '../src/index.js'
+import * as publicApi from '../src/index'
 import {
   pipe,
   type DevtoolsMutator,
@@ -9,10 +9,10 @@ import {
   type Pipe,
   type PipeMiddleware,
   type SubscribeWithSelectorMutator,
-} from '../src/index.js'
-import type { PipeCanUseMiddleware } from '../src/types.js'
-import * as middleware from '../src/middleware.js'
-import { immer } from '../src/middleware/immer.js'
+} from '../src/index'
+import type { PipeCanUseMiddleware } from '../src/types'
+import * as middleware from '../src/middleware'
+import { immer } from '../src/middleware/immer'
 import {
   combine,
   createJSONStorage,
@@ -21,7 +21,7 @@ import {
   redux,
   subscribeWithSelector,
   type StateStorage,
-} from '../src/middleware.js'
+} from '../src/middleware'
 
 interface CounterState {
   count: number
