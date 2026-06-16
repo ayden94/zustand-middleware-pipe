@@ -50,25 +50,53 @@ type PipeCanBeInnerStack<
     : false
   : true
 
+type PipeHasBuiltInMutator<
+  Mutators extends MutatorTuple,
+  Id extends PipeBuiltInMutatorId,
+> = Mutators extends [
+  infer Current extends [StoreMutatorIdentifier, unknown],
+  ...infer Rest extends MutatorTuple,
+]
+  ? Current[0] extends Id
+    ? true
+    : PipeHasBuiltInMutator<Rest, Id>
+  : false
+
 type PipeCanUseProducedMutator<
   CurrentStoreMutators extends MutatorTuple,
+  SeenBuiltInMutators extends MutatorTuple,
   Produced extends [StoreMutatorIdentifier, unknown],
 > = Produced[0] extends PipeBuiltInMutatorId
-  ? PipeCanBeInnerStack<CurrentStoreMutators, Produced[0]>
+  ? PipeHasBuiltInMutator<
+      CurrentStoreMutators,
+      Produced[0]
+    > extends true
+    ? false
+    : PipeHasBuiltInMutator<SeenBuiltInMutators, Produced[0]> extends true
+      ? false
+      : PipeCanBeInnerStack<CurrentStoreMutators, Produced[0]>
   : true
 
 export type PipeCanUseMiddleware<
   CurrentStoreMutators extends MutatorTuple,
   Produced extends MutatorTuple,
+  SeenBuiltInMutators extends MutatorTuple = [],
 > = Produced extends [
   infer Current extends [StoreMutatorIdentifier, unknown],
   ...infer Rest extends MutatorTuple,
 ]
   ? PipeCanUseProducedMutator<
       CurrentStoreMutators,
+      SeenBuiltInMutators,
       Current
     > extends true
-    ? PipeCanUseMiddleware<CurrentStoreMutators, Rest>
+    ? PipeCanUseMiddleware<
+        CurrentStoreMutators,
+        Rest,
+        Current[0] extends PipeBuiltInMutatorId
+          ? [...SeenBuiltInMutators, Current]
+          : SeenBuiltInMutators
+      >
     : false
   : true
 

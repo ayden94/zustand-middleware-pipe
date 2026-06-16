@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { pipe } from 'zustand-middleware-pipe'
-import { combine, devtools } from 'zustand-middleware-pipe/middleware'
+import { combine, devtools, subscribeWithSelector } from 'zustand-middleware-pipe/middleware'
 
 export interface CombinedCounterState {
   count: number
@@ -10,8 +10,9 @@ export interface CombinedCounterState {
 }
 
 export const useCombinedCounterStore = create<CombinedCounterState>()(
-  pipe
+  pipe    
     .use(devtools({ name: 'CombinedCounterExample', enabled: false }))
+    .use(subscribeWithSelector())
     .create(
       combine({ count: 0 }, (set) => ({
         decrement: () => {

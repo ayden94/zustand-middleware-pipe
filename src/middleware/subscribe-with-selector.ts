@@ -6,16 +6,20 @@ import type {
   PipeAnyMiddleware,
   SubscribeWithSelectorMutator,
 } from '../types'
+import { tagBuiltInMiddleware } from '../middleware-metadata'
 
 export function subscribeWithSelector(): PipeAnyMiddleware<
   [SubscribeWithSelectorMutator],
   [SubscribeWithSelectorMutator]
 > {
-  return <T, Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
-    initializer: StateCreator<
-      T,
-      [...Mps, SubscribeWithSelectorMutator],
-      Mcs
-    >,
-  ) => zustandSubscribeWithSelector(initializer)
+  return tagBuiltInMiddleware(
+    <T, Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
+      initializer: StateCreator<
+        T,
+        [...Mps, SubscribeWithSelectorMutator],
+        Mcs
+      >,
+    ) => zustandSubscribeWithSelector(initializer),
+    'subscribeWithSelector',
+  )
 }

@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createStore } from 'zustand/vanilla'
+import { createJSONStorage as officialCreateJSONStorage } from 'zustand/middleware'
 import * as publicApi from '../src/index'
 import {
   pipe,
@@ -23,6 +24,12 @@ import {
   type StateStorage,
 } from '../src/middleware'
 
+declare module 'zustand/vanilla' {
+  interface StoreMutators<S, A> {
+    'zustand-pipe/userland': S
+  }
+}
+
 interface CounterState {
   count: number
   label: string
@@ -37,8 +44,40 @@ type ReduxCounterStore = Pick<CounterState, 'count'> & {
   dispatch: (action: CounterAction) => CounterAction
 }
 
-function createMemoryStorage(): StateStorage {
-  const values = new Map<string, string>()
+type SubscribeCounterState = {
+  count: number
+  label: string
+  inc: () => void
+}
+
+type PersistHydrationEvent = {
+  count: number
+  label: string
+}
+
+type UserlandMutator = ['zustand-pipe/userland', never]
+
+type MemoryStorageFixture = StateStorage & {
+  getRawItem: (name: string) => string | undefined
+}
+
+type DevtoolsConnectionMock = {
+  init: (state: unknown) => void
+  send: (action: unknown, state: unknown) => void
+  subscribe: (listener: (message: unknown) => void) => void
+  unsubscribe: () => void
+}
+
+type WindowWithReduxDevtools = {
+  __REDUX_DEVTOOLS_EXTENSION__?: {
+    connect: (options: unknown) => DevtoolsConnectionMock
+  }
+}
+
+function createMemoryStorage(
+  seededValues: Record<string, string> = {},
+): MemoryStorageFixture {
+  const values = new Map(Object.entries(seededValues))
 
   return {
     getItem: (name) => values.get(name) ?? null,
@@ -47,6 +86,23 @@ function createMemoryStorage(): StateStorage {
     },
     removeItem: (name) => {
       values.delete(name)
+    },
+    getRawItem: (name) => values.get(name),
+  }
+}
+
+function createUnavailableStorage(): StateStorage {
+  const error = new Error('storage unavailable')
+
+  return {
+    getItem: () => {
+      throw error
+    },
+    setItem: () => {
+      throw error
+    },
+    removeItem: () => {
+      throw error
     },
   }
 }
@@ -63,7 +119,309 @@ function createOrderMarkerMiddleware<T>(
   }
 }
 
+function captureUseError(builder: unknown, middleware: unknown): unknown {
+  const typeBypassedBuilder = builder as {
+    use: (middleware: unknown) => unknown
+  }
+
+  try {
+    typeBypassedBuilder.use(middleware)
+  } catch (error) {
+    return error
+  }
+
+  return undefined
+}
+
+function createCombinedCounterStore() {
+  return createStore<CounterState>()(
+    pipe
+      .use(devtools({ name: 'CombinedCounterStore', enabled: false }))
+      .create<CounterState>(
+        combine({ count: 0, label: 'counter' }, (set) => ({
+          inc: () => {
+            set((state) => ({ count: state.count + 1 }))
+          },
+          setLabel: (label: string) => {
+            set({ label })
+          },
+        })),
+      ),
+  )
+}
+
+function createCombinedCounterStoreWithSelector() {
+  return createStore<CounterState>()(
+    pipe
+      .use(devtools({ name: 'CombinedCounterStoreWithSelector', enabled: false }))
+      .use(subscribeWithSelector())
+      .create<CounterState>(
+        combine({ count: 0, label: 'counter' }, (set) => ({
+          inc: () => {
+            set((state) => ({ count: state.count + 1 }))
+          },
+          setLabel: (label: string) => {
+            set({ label })
+          },
+        })),
+      ),
+  )
+}
+
+function createReduxCounterStore() {
+  const reducer = (
+    state: Pick<CounterState, 'count'>,
+    action: CounterAction,
+  ) => {
+    if (action.type === 'inc') {
+      return { count: state.count + 1 }
+    }
+
+    return state
+  }
+
+  return createStore<ReduxCounterStore>()(
+    pipe
+      .use(devtools({ name: 'ReduxCounterStore', enabled: false }))
+      .create(redux(reducer, { count: 0 })),
+  )
+}
+
+function createReduxCounterStoreWithSelector() {
+  const reducer = (
+    state: Pick<CounterState, 'count'>,
+    action: CounterAction,
+  ) => {
+    if (action.type === 'inc') {
+      return { count: state.count + 1 }
+    }
+
+    return state
+  }
+
+  return createStore<ReduxCounterStore>()(
+    pipe
+      .use(devtools({ name: 'ReduxCounterStoreWithSelector', enabled: false }))
+      .use(subscribeWithSelector())
+      .create(redux(reducer, { count: 0 })),
+  )
+}
+
+function createSubscribeWithSelectorCounterStore() {
+  return createStore<SubscribeCounterState>()(
+    pipe.use(subscribeWithSelector()).create((set) => ({
+      count: 0,
+      label: 'counter',
+      inc: () => {
+        set((state) => ({ count: state.count + 1 }))
+      },
+    })),
+  )
+}
+
+function assertInvalidBuiltInStacksAtCompileTime() {
+  // Compile-only regressions: TypeScript must reject invalid built-in stacks.
+  void pipe
+    .use(
+      persist<CounterState, PersistedCounterState>({
+        name: 'counter-order-regression',
+        storage: createJSONStorage<PersistedCounterState>(() =>
+          createMemoryStorage(),
+        ),
+        partialize: (state) => ({ count: state.count }),
+      }),
+    )
+    // @ts-expect-error built-ins must be added outer-to-inner
+    .use(devtools({ name: 'CounterOrderRegression', enabled: false }))
+
+  void pipe
+    .use(devtools({ name: 'CounterDuplicateRegression', enabled: false }))
+    .use(
+      // @ts-expect-error built-in middleware cannot be repeated in the stack
+      devtools({
+        name: 'CounterDuplicateRegressionAgain',
+        enabled: false,
+      }),
+    )
+}
+
+void assertInvalidBuiltInStacksAtCompileTime
+
 describe('pipe', () => {
+  it('supports reusable storage fixtures with raw inspection', () => {
+    const storage = createMemoryStorage({
+      seed: '{"state":{"count":1},"version":0}',
+    })
+
+    expect(storage.getItem('missing')).toBeNull()
+    expect(storage.getRawItem('seed')).toBe('{"state":{"count":1},"version":0}')
+
+    storage.setItem('counter', '{"state":{"count":2},"version":0}')
+
+    expect(storage.getItem('counter')).toBe('{"state":{"count":2},"version":0}')
+    expect(storage.getRawItem('counter')).toBe('{"state":{"count":2},"version":0}')
+
+    storage.removeItem('counter')
+
+    expect(storage.getItem('counter')).toBeNull()
+    expect(storage.getRawItem('counter')).toBeUndefined()
+  })
+
+  it('supports seeded JSON hydration and exact payload inspection', () => {
+    const storage = createMemoryStorage({
+      counter: '{"state":{"count":7},"version":3}',
+    })
+    const jsonStorage = createJSONStorage<PersistedCounterState>(() => storage)
+
+    expect(jsonStorage).toBeDefined()
+    expect(jsonStorage?.getItem('counter')).toEqual({
+      state: { count: 7 },
+      version: 3,
+    })
+
+    jsonStorage?.setItem('counter', {
+      state: { count: 8 },
+      version: 4,
+    })
+
+    expect(storage.getRawItem('counter')).toBe('{"state":{"count":8},"version":4}')
+
+    jsonStorage?.removeItem('counter')
+
+    expect(storage.getRawItem('counter')).toBeUndefined()
+  })
+
+  it('treats unavailable storage lookups as undefined JSON storage', () => {
+    const storage = createUnavailableStorage()
+
+    expect(() => storage.getItem('counter')).toThrow('storage unavailable')
+    expect(() => storage.setItem('counter', 'value')).toThrow(
+      'storage unavailable',
+    )
+    expect(() => storage.removeItem('counter')).toThrow('storage unavailable')
+    expect(
+      createJSONStorage<PersistedCounterState>(() => {
+        throw new Error('storage unavailable')
+      }),
+    ).toBeUndefined()
+  })
+
+  it('persists only the partialized state through pipe and createJSONStorage', () => {
+    const storage = createMemoryStorage()
+    const store = createStore<CounterState>()(
+      pipe
+        .use(persist<CounterState, PersistedCounterState>({
+          name: 'counter-partialize-through-pipe',
+          storage: createJSONStorage<PersistedCounterState>(() => storage),
+          partialize: (state) => ({ count: state.count }),
+          skipHydration: true,
+        }))
+        .create((set) => ({
+          count: 0,
+          label: 'counter',
+          inc: () => {
+            set((state) => ({ count: state.count + 1 }))
+          },
+          setLabel: (label) => {
+            set({ label })
+          },
+        })),
+    )
+
+    expect(storage.getRawItem('counter-partialize-through-pipe')).toBeUndefined()
+
+    store.getState().setLabel('ignored label')
+
+    expect(storage.getRawItem('counter-partialize-through-pipe')).toBe(
+      '{"state":{"count":0},"version":0}',
+    )
+
+    store.getState().inc()
+
+    expect(storage.getRawItem('counter-partialize-through-pipe')).toBe(
+      '{"state":{"count":1},"version":0}',
+    )
+    expect(storage.getRawItem('counter-partialize-through-pipe')).not.toContain(
+      'ignored label',
+    )
+  })
+
+  it('hydrates seeded JSON explicitly through pipe rehydrate', async () => {
+    const storage = createMemoryStorage({
+      'counter-explicit-rehydrate': '{"state":{"count":7},"version":0}',
+    })
+    const hydrationEvents: PersistHydrationEvent[] = []
+    const store = createStore<CounterState>()(
+      pipe
+        .use(persist<CounterState, PersistedCounterState>({
+          name: 'counter-explicit-rehydrate',
+          storage: createJSONStorage<PersistedCounterState>(() => storage),
+          partialize: (state) => ({ count: state.count }),
+          skipHydration: true,
+        }))
+        .create((set) => ({
+          count: 0,
+          label: 'counter',
+          inc: () => {
+            set((state) => ({ count: state.count + 1 }))
+          },
+          setLabel: (label) => {
+            set({ label })
+          },
+        })),
+    )
+
+    store.persist.onFinishHydration((state) => {
+      hydrationEvents.push({ count: state.count, label: state.label })
+    })
+
+    expect(store.persist.hasHydrated()).toBe(false)
+    expect(store.getState().count).toBe(0)
+
+    await store.persist.rehydrate()
+
+    expect(store.persist.hasHydrated()).toBe(true)
+    expect(store.getState().count).toBe(7)
+    expect(store.getState().label).toBe('counter')
+    expect(hydrationEvents).toEqual([{ count: 7, label: 'counter' }])
+  })
+
+  it('handles throwing storage rehydrate through pipe without uncaught crashes', async () => {
+    const storage = createJSONStorage<PersistedCounterState>(() =>
+      createUnavailableStorage(),
+    )
+    const rehydrateErrors: unknown[] = []
+    const store = createStore<CounterState>()(
+      pipe
+        .use(persist<CounterState, PersistedCounterState>({
+          name: 'counter-unavailable-through-pipe',
+          storage,
+          partialize: (state) => ({ count: state.count }),
+          skipHydration: true,
+          onRehydrateStorage: () => (_state, error) => {
+            rehydrateErrors.push(error)
+          },
+        }))
+        .create((set) => ({
+          count: 0,
+          label: 'counter',
+          inc: () => {
+            set((state) => ({ count: state.count + 1 }))
+          },
+          setLabel: (label) => {
+            set({ label })
+          },
+        })),
+    )
+
+    await expect(store.persist.rehydrate()).resolves.toBeUndefined()
+
+    expect(store.persist.hasHydrated()).toBe(false)
+    expect(store.getState().count).toBe(0)
+    expect(rehydrateErrors).toHaveLength(1)
+    expect(rehydrateErrors[0]).toBeInstanceOf(Error)
+  })
+
   it('exports the intended root runtime helpers', () => {
     expect(Object.keys(publicApi).sort()).toEqual([
       'pipe',
@@ -98,6 +456,7 @@ describe('pipe', () => {
     expect('immer' in middleware).toBe(false)
     expect(typeof middleware.combine).toBe('function')
     expect(typeof middleware.createJSONStorage).toBe('function')
+    expect(middleware.createJSONStorage).toBe(officialCreateJSONStorage)
     expect(typeof middleware.persist).toBe('function')
     expect(typeof middleware.redux).toBe('function')
     expect(typeof middleware.subscribeWithSelector).toBe('function')
@@ -109,38 +468,112 @@ describe('pipe', () => {
   })
 
   it('builds a Zustand middleware stack while preserving store extensions', () => {
-    const store = createStore<CounterState>()(
-      pipe
-        .use(devtools({ name: 'CounterStore', enabled: false }))
-        .use(subscribeWithSelector())
-        .use(persist<CounterState, PersistedCounterState>({
-          name: 'counter',
-          storage: createJSONStorage<PersistedCounterState>(() =>
-            createMemoryStorage(),
-          ),
-          partialize: (state) => ({ count: state.count }),
-        }))
-        .use(immer())
-        .create((set) => ({
-          count: 0,
-          label: 'counter',
-          inc: () => {
-            set(
-              (state) => {
-                state.count += 1
-              },
-              false,
-              'counter/inc',
-            )
-          },
-          setLabel: (label) => {
-            set({ label }, false, 'counter/setLabel')
-          },
-        })),
+    const storage = createMemoryStorage()
+    const originalWindowDescriptor = Object.getOwnPropertyDescriptor(
+      globalThis,
+      'window',
     )
+    const cleanupEvents: string[] = []
+    const windowMock: WindowWithReduxDevtools = {
+      __REDUX_DEVTOOLS_EXTENSION__: {
+        connect: () => ({
+          init: () => {},
+          send: () => {},
+          subscribe: () => {},
+          unsubscribe: () => {
+            cleanupEvents.push('cleanup')
+          },
+        }),
+      },
+    }
 
-    expectTypeOf(store.persist.hasHydrated()).toEqualTypeOf<boolean>()
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: windowMock,
+    })
+
+    try {
+      const store = createStore<CounterState>()(
+        pipe
+          .use(devtools({ name: 'CounterStore' }))
+          .use(subscribeWithSelector())
+          .use(persist<CounterState, PersistedCounterState>({
+            name: 'counter',
+            storage: createJSONStorage<PersistedCounterState>(() => storage),
+            partialize: (state) => ({ count: state.count }),
+          }))
+          .use(immer())
+          .create((set) => ({
+            count: 0,
+            label: 'counter',
+            inc: () => {
+              set(
+                (state) => {
+                  state.count += 1
+                },
+                false,
+                'counter/inc',
+              )
+            },
+            setLabel: (label) => {
+              set({ label }, false, 'counter/setLabel')
+            },
+          })),
+      )
+
+      expectTypeOf(store.persist.hasHydrated()).toEqualTypeOf<boolean>()
+      expectTypeOf<typeof store.devtools.cleanup>().toEqualTypeOf<() => void>()
+      expect(store.persist.hasHydrated()).toBe(true)
+      expect(typeof store.devtools.cleanup).toBe('function')
+
+      const observed: Array<readonly [number, number]> = []
+      const unsubscribe = store.subscribe(
+        (state) => state.count,
+        (count, previousCount) => {
+          observed.push([count, previousCount])
+        },
+      )
+
+      store.getState().inc()
+      expect(store.getState().count).toBe(1)
+      expect(storage.getRawItem('counter')).toBe(
+        '{"state":{"count":1},"version":0}',
+      )
+
+      store.setState({ count: 2 }, false, 'counter/setCount')
+
+      expect(store.getState().count).toBe(2)
+      expect(observed).toEqual([
+        [1, 0],
+        [2, 1],
+      ])
+      expect(storage.getRawItem('counter')).toBe(
+        '{"state":{"count":2},"version":0}',
+      )
+
+      unsubscribe()
+      store.devtools.cleanup()
+      expect(cleanupEvents).toEqual(['cleanup'])
+    } finally {
+      if (originalWindowDescriptor) {
+        Object.defineProperty(globalThis, 'window', originalWindowDescriptor)
+      } else {
+        delete (globalThis as { window?: unknown }).window
+      }
+    }
+  })
+
+  it('supports official combine as a terminal state creator helper', () => {
+    const store = createCombinedCounterStore()
+
+    store.getState().inc()
+
+    expect(store.getState().count).toBe(1)
     expectTypeOf<typeof store.devtools.cleanup>().toEqualTypeOf<() => void>()
+  })
+
+  it('supports official combine as a terminal state creator helper under subscribeWithSelector', () => {
+    const store = createCombinedCounterStoreWithSelector()
 
     const observed: Array<readonly [number, number]> = []
     const unsubscribe = store.subscribe(
@@ -150,58 +583,27 @@ describe('pipe', () => {
       },
     )
 
+    store.getState().setLabel('renamed')
     store.getState().inc()
-    store.setState({ count: 2 }, false, 'counter/setCount')
+    store.setState({ count: 2, label: 'final' })
 
-    expect(store.getState().count).toBe(2)
+    expect(store.getState()).toEqual({
+      count: 2,
+      label: 'final',
+      inc: expect.any(Function),
+      setLabel: expect.any(Function),
+    })
     expect(observed).toEqual([
       [1, 0],
       [2, 1],
     ])
-    expect(store.persist.hasHydrated()).toBe(true)
+    expectTypeOf<typeof store.devtools.cleanup>().toEqualTypeOf<() => void>()
 
     unsubscribe()
   })
 
-  it('supports official combine as a terminal state creator helper', () => {
-    const store = createStore(
-      pipe
-        .use(devtools({ name: 'CombinedCounterStore', enabled: false }))
-        .create<CounterState>(
-          combine({ count: 0, label: 'counter' }, (set) => ({
-            inc: () => {
-              set((state) => ({ count: state.count + 1 }))
-            },
-            setLabel: (label: string) => {
-              set({ label })
-            },
-          })),
-        ),
-    )
-
-    store.getState().inc()
-
-    expect(store.getState().count).toBe(1)
-    expectTypeOf<typeof store.devtools.cleanup>().toEqualTypeOf<() => void>()
-  })
-
   it('supports official redux as a terminal state creator helper', () => {
-    const reducer = (
-      state: Pick<CounterState, 'count'>,
-      action: CounterAction,
-    ) => {
-      if (action.type === 'inc') {
-        return { count: state.count + 1 }
-      }
-
-      return state
-    }
-
-    const store = createStore<ReduxCounterStore>()(
-      pipe
-        .use(devtools({ name: 'ReduxCounterStore', enabled: false }))
-        .create(redux(reducer, { count: 0 })),
-    )
+    const store = createReduxCounterStore()
 
     store.dispatch({ type: 'inc' })
 
@@ -210,6 +612,116 @@ describe('pipe', () => {
       (action: CounterAction) => CounterAction
     >()
     expectTypeOf<typeof store.devtools.cleanup>().toEqualTypeOf<() => void>()
+  })
+
+  it('supports official redux as a terminal state creator helper under subscribeWithSelector', () => {
+    const store = createReduxCounterStoreWithSelector()
+
+    const observed: Array<readonly [number, number]> = []
+    const unsubscribe = store.subscribe(
+      (state) => state.count,
+      (count, previousCount) => {
+        observed.push([count, previousCount])
+      },
+    )
+
+    const dispatched = store.dispatch({ type: 'inc' })
+    store.setState({ count: 2 })
+
+    expect(dispatched).toEqual({ type: 'inc' })
+    expect(store.getState().count).toBe(2)
+    expect(observed).toEqual([
+      [1, 0],
+      [2, 1],
+    ])
+    expectTypeOf(store.dispatch).toEqualTypeOf<
+      (action: CounterAction) => CounterAction
+    >()
+    expectTypeOf<typeof store.devtools.cleanup>().toEqualTypeOf<() => void>()
+
+    unsubscribe()
+  })
+
+  it('keeps selector and plain subscribe behavior with subscribeWithSelector', () => {
+    const store = createSubscribeWithSelectorCounterStore()
+
+    const selectedObserved: Array<readonly [number, number]> = []
+    const unsubscribeSelected = store.subscribe(
+      (state) => state.count,
+      (count, previousCount) => {
+        selectedObserved.push([count, previousCount])
+      },
+    )
+
+    const plainObserved: SubscribeCounterState[] = []
+    const unsubscribePlain = store.subscribe((state) => {
+      plainObserved.push(state)
+    })
+
+    store.getState().inc()
+    store.setState({ count: 2, label: 'second' })
+
+    expect(selectedObserved).toEqual([
+      [1, 0],
+      [2, 1],
+    ])
+    expect(plainObserved).toEqual([
+      expect.objectContaining({ count: 1, label: 'counter' }),
+      expect.objectContaining({ count: 2, label: 'second' }),
+    ])
+
+    unsubscribeSelected()
+    unsubscribePlain()
+  })
+
+  it('suppresses equivalent selected values with equalityFn', () => {
+    const store = createSubscribeWithSelectorCounterStore()
+
+    const selectedObserved: Array<readonly [number, number]> = []
+    const unsubscribe = store.subscribe(
+      (state) => state.count,
+      (count, previousCount) => {
+        selectedObserved.push([count, previousCount])
+      },
+      {
+        equalityFn: (countA, countB) => countA % 2 === countB % 2,
+      },
+    )
+
+    store.getState().inc()
+    store.setState({ count: 3, label: 'third' })
+    store.setState({ count: 4, label: 'fourth' })
+
+    expect(selectedObserved).toEqual([
+      [1, 0],
+      [4, 1],
+    ])
+
+    unsubscribe()
+  })
+
+  it('fires immediately with the initial selected value', () => {
+    const store = createSubscribeWithSelectorCounterStore()
+
+    const selectedObserved: Array<readonly [number, number]> = []
+    const unsubscribe = store.subscribe(
+      (state) => state.count,
+      (count, previousCount) => {
+        selectedObserved.push([count, previousCount])
+      },
+      { fireImmediately: true },
+    )
+
+    store.getState().inc()
+    store.setState({ count: 2, label: 'second' })
+
+    expect(selectedObserved).toEqual([
+      [0, 0],
+      [1, 0],
+      [2, 1],
+    ])
+
+    unsubscribe()
   })
 
   it('preserves use order with earlier middleware wrapping later middleware', () => {
@@ -231,6 +743,124 @@ describe('pipe', () => {
     ])
   })
 
+  it('allows repeated untagged middleware at runtime', () => {
+    const events: string[] = []
+    const marker = createOrderMarkerMiddleware<{ count: number }>(
+      'marker',
+      events,
+    )
+
+    const store = createStore<{ count: number }>()(
+      pipe.use(marker).use(marker).create(() => ({ count: 0 })),
+    )
+
+    expect(store.getState().count).toBe(0)
+    expect(events).toEqual([
+      'marker:before',
+      'marker:before',
+      'marker:after',
+      'marker:after',
+    ])
+  })
+
+  it('rejects package built-in wrong order at .use(...) time', () => {
+    const builder = pipe.use(
+      persist<CounterState, PersistedCounterState>({
+        name: 'counter-runtime-order-regression',
+        storage: createJSONStorage<PersistedCounterState>(() =>
+          createMemoryStorage(),
+        ),
+        partialize: (state) => ({ count: state.count }),
+      }),
+    )
+    const typeBypassedBuilder = builder as unknown as {
+      use: (middleware: unknown) => unknown
+    }
+    let thrown: unknown
+
+    try {
+      typeBypassedBuilder.use(
+        devtools({
+          name: 'CounterRuntimeOrderRegression',
+          enabled: false,
+        }),
+      )
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBeInstanceOf(TypeError)
+
+    if (!(thrown instanceof Error)) {
+      throw new Error('Expected .use(...) to throw an Error instance')
+    }
+
+    expect(thrown.message).toContain(
+      'devtools, subscribeWithSelector, persist, immer',
+    )
+  })
+
+  it('rejects duplicate package built-ins at .use(...) time', () => {
+    const duplicateCases: Array<{
+      kind: string
+      builder: unknown
+      duplicate: unknown
+    }> = [
+      {
+        kind: 'devtools',
+        builder: pipe.use(
+          devtools({ name: 'CounterRuntimeDuplicateDevtools', enabled: false }),
+        ),
+        duplicate: devtools({
+          name: 'CounterRuntimeDuplicateDevtoolsAgain',
+          enabled: false,
+        }),
+      },
+      {
+        kind: 'subscribeWithSelector',
+        builder: pipe.use(subscribeWithSelector()),
+        duplicate: subscribeWithSelector(),
+      },
+      {
+        kind: 'persist',
+        builder: pipe.use(
+          persist<CounterState, PersistedCounterState>({
+            name: 'counter-runtime-duplicate-persist',
+            storage: createJSONStorage<PersistedCounterState>(() =>
+              createMemoryStorage(),
+            ),
+            partialize: (state) => ({ count: state.count }),
+          }),
+        ),
+        duplicate: persist<CounterState, PersistedCounterState>({
+          name: 'counter-runtime-duplicate-persist-again',
+          storage: createJSONStorage<PersistedCounterState>(() =>
+            createMemoryStorage(),
+          ),
+          partialize: (state) => ({ count: state.count }),
+        }),
+      },
+      {
+        kind: 'immer',
+        builder: pipe.use(immer()),
+        duplicate: immer(),
+      },
+    ]
+
+    for (const { kind, builder, duplicate } of duplicateCases) {
+      const thrown = captureUseError(builder, duplicate)
+
+      expect(thrown).toBeInstanceOf(TypeError)
+
+      if (!(thrown instanceof Error)) {
+        throw new Error(`Expected duplicate ${kind} to throw an Error instance`)
+      }
+
+      expect(thrown.message).toContain(kind)
+      expect(thrown.message).toContain('cannot be added more than once')
+    }
+  })
+
   it('models the recommended built-in middleware order at the type level', () => {
     expectTypeOf<
       PipeCanUseMiddleware<
@@ -241,6 +871,39 @@ describe('pipe', () => {
     expectTypeOf<
       PipeCanUseMiddleware<[PersistMutator], [DevtoolsMutator]>
     >().toEqualTypeOf<false>()
+    expectTypeOf<
+      PipeCanUseMiddleware<[], [DevtoolsMutator, PersistMutator]>
+    >().toEqualTypeOf<true>()
+    expectTypeOf<
+      PipeCanUseMiddleware<[PersistMutator], [ImmerMutator]>
+    >().toEqualTypeOf<true>()
+  })
+
+  it('rejects duplicate package built-in mutators at the type level', () => {
+    expectTypeOf<
+      PipeCanUseMiddleware<[DevtoolsMutator], [DevtoolsMutator]>
+    >().toEqualTypeOf<false>()
+    expectTypeOf<
+      PipeCanUseMiddleware<
+        [SubscribeWithSelectorMutator],
+        [SubscribeWithSelectorMutator]
+      >
+    >().toEqualTypeOf<false>()
+    expectTypeOf<
+      PipeCanUseMiddleware<[PersistMutator], [PersistMutator]>
+    >().toEqualTypeOf<false>()
+    expectTypeOf<
+      PipeCanUseMiddleware<[ImmerMutator], [ImmerMutator]>
+    >().toEqualTypeOf<false>()
+    expectTypeOf<
+      PipeCanUseMiddleware<[], [DevtoolsMutator, DevtoolsMutator]>
+    >().toEqualTypeOf<false>()
+  })
+
+  it('does not reject repeated non-built-in mutators at the type level', () => {
+    expectTypeOf<
+      PipeCanUseMiddleware<[UserlandMutator], [UserlandMutator]>
+    >().toEqualTypeOf<true>()
   })
 
   it('allows pipe creators without immer when the stack omits immer', () => {

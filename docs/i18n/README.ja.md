@@ -227,7 +227,9 @@ const useReduxCounterStore = create<CounterState & { dispatch: Dispatch }>()(
 - **公式 Zustand guidance ではありません。** これは userland の実験です。
 - **すでに動いている store を書き直さないでください。**
 - **Bundler resolution を前提とします。** この package は extensionless な内部相対 import を持つ ESM として emit されるため、bundler-compatible toolchain 経由で使用してください。
-- **built-in wrapper の順序は強制されます。** outer-to-inner の順で追加してください: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. 逆順の built-in wrapper は `.use(...)` で拒否されます。
+- **built-in wrapper の順序と重複は強制されます。** package が提供する wrapper は outer-to-inner の順で追加してください: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. TypeScript と runtime の `.use(...)` 境界は、逆順の built-in wrapper と重複した package built-in を拒否します。
+- **runtime guard は tag 付きの package built-in に限定されます。** この package の `devtools`, `subscribeWithSelector`, `persist`, `immer` adapter が返す wrapper だけを検査します。任意の untagged、userland、third-party middleware の順序や重複は introspect しません。
+- **直接 reexport は Zustand helper の意味を保ちます。** `combine`, `redux`, `createJSONStorage` は直接の Zustand helper です。`combine` と `redux` は `.use(...)` ではなく `.create(...)` の中に置き、`immer` は引き続き専用の `zustand-middleware-pipe/middleware/immer` subpath から使います。
 - **`store.devtools` の可用性**は通常の Zustand devtools の動作に依存します。devtools が無効化されているか Redux DevTools extension がない場合は、利用できないことがあります。
 - **サードパーティ middleware** は自動的には合成できません。builder と連携するには、wrapper に正しい mutator tuple 型が必要です。
 

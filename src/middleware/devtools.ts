@@ -6,11 +6,15 @@ import type {
   MutatorTuple,
   PipeAnyMiddleware,
 } from '../types'
+import { tagBuiltInMiddleware } from '../middleware-metadata'
 
 export function devtools(
   options?: DevtoolsOptions,
 ): PipeAnyMiddleware<[DevtoolsMutator], [DevtoolsMutator]> {
-  return <T, Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
-    initializer: StateCreator<T, [...Mps, DevtoolsMutator], Mcs>,
-  ) => zustandDevtools(initializer, options)
+  return tagBuiltInMiddleware(
+    <T, Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
+      initializer: StateCreator<T, [...Mps, DevtoolsMutator], Mcs>,
+    ) => zustandDevtools(initializer, options),
+    'devtools',
+  )
 }

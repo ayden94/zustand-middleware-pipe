@@ -6,6 +6,7 @@ import type {
   PersistMutator,
   PipeMiddleware,
 } from '../types'
+import { tagBuiltInMiddleware } from '../middleware-metadata'
 
 export function persist<
   T,
@@ -18,7 +19,10 @@ export function persist<
   [PersistMutator],
   [PersistMutator<PersistedState>]
 > {
-  return <Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
-    initializer: StateCreator<T, [...Mps, PersistMutator], Mcs>,
-  ) => zustandPersist(initializer, options)
+  return tagBuiltInMiddleware(
+    <Mps extends MutatorTuple = [], Mcs extends MutatorTuple = []>(
+      initializer: StateCreator<T, [...Mps, PersistMutator], Mcs>,
+    ) => zustandPersist(initializer, options),
+    'persist',
+  )
 }

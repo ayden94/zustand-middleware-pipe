@@ -25,7 +25,8 @@ const initialState = {
 } satisfies PersistedCounterState
 
 export const useFullChainCounterStore = create<FullChainCounterState>()(
-  pipe.use(devtools({ name: 'ZustandMiddlewarePipeDemo' }))
+  pipe
+    .use(devtools({ name: 'ZustandMiddlewarePipeDemo' }))
     .use(subscribeWithSelector())
     .use(persist<FullChainCounterState, PersistedCounterState>({
       name: 'zustand-middleware-pipe-demo',

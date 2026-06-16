@@ -226,7 +226,9 @@ const useReduxCounterStore = create<CounterState & { dispatch: Dispatch }>()(
 - **Not official Zustand guidance.** This is a userland experiment.
 - **Do not rewrite working stores** just to use this helper.
 - **Bundler resolution is expected.** The package is emitted as ESM with extensionless internal relative imports, so consume it through a bundler-compatible toolchain.
-- **Built-in wrapper order is enforced.** Add wrappers outer-to-inner: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. Reversed built-in order is rejected at `.use(...)`.
+- **Built-in wrapper order and duplicates are enforced.** Add package-provided wrappers outer-to-inner: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. TypeScript and the runtime `.use(...)` boundary reject reversed built-in order and duplicate package built-ins.
+- **Runtime guards are scoped to tagged package built-ins.** Only wrappers returned by this package's `devtools`, `subscribeWithSelector`, `persist`, and `immer` adapters are checked; arbitrary untagged, userland, or third-party middleware is not introspected for order or duplicates.
+- **Direct reexports keep Zustand helper semantics.** `combine`, `redux`, and `createJSONStorage` are direct Zustand helpers; `combine` and `redux` belong inside `.create(...)`, not `.use(...)`, and `immer` remains available from the dedicated `zustand-middleware-pipe/middleware/immer` subpath.
 - **`store.devtools` availability** depends on normal Zustand devtools behavior. It may not exist when devtools are disabled or the Redux DevTools extension is absent.
 - **Third-party middleware** is not automatically composable. Wrappers need correct mutator tuple types to work with the builder.
 
