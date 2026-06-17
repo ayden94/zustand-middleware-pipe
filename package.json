@@ -48,7 +48,7 @@
   "main": "./dist/index.js",
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "build": "npm run clean && tsc -p tsconfig.build.json && node scripts/fix-esm-imports.mjs",
     "example:install": "npm run build && rm -rf examples/node_modules/zustand-middleware-pipe && npm install --prefix examples --install-links",
     "example:dev": "npm run example:install && npm run dev --prefix examples",
     "example:build": "npm run example:install && npm run build --prefix examples",
