@@ -65,7 +65,7 @@ Options end up scattered: `persist` options are buried in the middle, `devtools`
 
 ## The fix: write the stack as a pipeline
 
-`pipe` lets the same wrapper stack be written top-to-bottom, with the base creator last:
+`pipe` is a middleware pipeline builder. It lets the same wrapper stack be written top-to-bottom, with the base creator last:
 
 ```ts
 // writing order matches the nested wrapper expression ↓
@@ -77,6 +77,13 @@ pipe
   .create((set) => ({ ... }))
 ```
 
+The evaluation result is identical:
+
+```ts
+// pipe produces exactly this at runtime
+devtools(subscribeWithSelector(persist(immer(baseCreator), options)), options)
+```
+
 ### Before / After
 
 | | Before (inside-out) | After (pipe) |
@@ -86,12 +93,23 @@ pipe
 | **`set` type** | Inferred by nesting | Accumulated by the builder chain |
 | **Adding middleware** | Wrap the whole expression again | Insert `.use(...)` at the matching wrapper position |
 
-The evaluation result is identical:
+### Refactoring existing stores with an LLM
 
-```ts
-// pipe produces exactly this at runtime
-devtools(subscribeWithSelector(persist(immer(baseCreator), options)), options)
+For larger stores, use [`docs/llm-context.md`](docs/llm-context.md) as the canonical LLM input. If your tool supports file references, attach or mention `@docs/llm-context.md`; otherwise paste the document contents before the store code.
+
+```md
+Use `docs/llm-context.md` as the rules for this refactor.
+
+Refactor this Zustand store to use `zustand-middleware-pipe`.
+
+- Preserve runtime behavior first.
+- Keep the middleware wrapper order unchanged: outermost wrapper first, base creator last.
+- Move wrappers into `pipe.use(...)` in the same outside-to-inside order.
+- Put the innermost state creator into `.create(...)`.
+- Run typecheck and relevant tests after the refactor.
 ```
+
+The context file contains the full import rules, type caveats, before/after examples, and safety checklist. This works best for dense stacks like `devtools(subscribeWithSelector(persist(immer(...))))`, where options are scattered across several indentation levels.
 
 ---
 

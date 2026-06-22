@@ -65,7 +65,7 @@ const useCounterStore = create<CounterState>()(
 
 ## 해결: 스택을 pipeline처럼 작성하기
 
-`pipe`를 쓰면 같은 wrapper stack을 위에서 아래로, base creator를 마지막에 두고 작성할 수 있습니다:
+`pipe`는 middleware pipeline builder입니다. 같은 wrapper stack을 위에서 아래로, base creator를 마지막에 두고 작성할 수 있게 해줍니다:
 
 ```ts
 // 작성 순서 = 중첩 wrapper 표현식 순서 ↓
@@ -77,6 +77,13 @@ pipe
   .create((set) => ({ ... }))
 ```
 
+평가 결과는 동일합니다:
+
+```ts
+// pipe는 런타임에서 이것과 정확히 동일합니다
+devtools(subscribeWithSelector(persist(immer(baseCreator), options)), options)
+```
+
 ### Before / After 비교
 
 | | Before (inside-out) | After (pipe) |
@@ -86,12 +93,23 @@ pipe
 | **`set` 타입** | 중첩 구조에서 추론 | builder chain이 누적하여 계산 |
 | **미들웨어 추가** | 전체 표현식을 다시 감쌈 | 대응되는 wrapper 위치에 `.use(...)` 삽입 |
 
-평가 결과는 동일합니다:
+### LLM으로 기존 store 리팩터링하기
 
-```ts
-// pipe는 런타임에서 이것과 정확히 동일합니다
-devtools(subscribeWithSelector(persist(immer(baseCreator), options)), options)
+큰 store를 리팩터링할 때는 [`docs/llm-context.md`](../llm-context.md)를 LLM 입력용 기준 문서로 사용하세요. 사용하는 도구가 파일 참조를 지원하면 `@docs/llm-context.md`를 첨부하거나 멘션하고, 지원하지 않으면 해당 문서 내용을 store 코드보다 먼저 붙여넣으면 됩니다.
+
+```md
+`docs/llm-context.md`를 이 리팩터링의 규칙으로 사용해줘.
+
+이 Zustand store를 `zustand-middleware-pipe`를 사용하도록 리팩터링해줘.
+
+- 런타임 동작 보존을 최우선으로 해줘.
+- 미들웨어 wrapper 순서는 바꾸지 마: 가장 바깥 wrapper가 먼저, base creator가 마지막이야.
+- wrapper를 같은 바깥쪽→안쪽 순서로 `pipe.use(...)`에 옮겨줘.
+- 가장 안쪽 state creator를 `.create(...)`에 넣어줘.
+- 리팩터링 후 typecheck와 관련 test를 실행해줘.
 ```
+
+이 컨텍스트 문서는 import 규칙, 타입 주의사항, before/after 예시, 안전 체크리스트를 담고 있습니다. 이 방식은 `devtools(subscribeWithSelector(persist(immer(...))))`처럼 option이 여러 들여쓰기 레벨에 흩어진 dense stack에서 특히 효과적입니다.
 
 ---
 

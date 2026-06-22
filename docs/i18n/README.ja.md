@@ -65,7 +65,7 @@ options は散らばります。`persist` の options は中間に埋まり、`d
 
 ## 解決: スタックを pipeline として書く
 
-`pipe` を使うと、同じ wrapper stack を上から下へ、base creator を最後に置いて書けます:
+`pipe` は middleware pipeline builder です。同じ wrapper stack を上から下へ、base creator を最後に置いて書けます:
 
 ```ts
 // 記述順序 = ネストした wrapper 表現の順序 ↓
@@ -77,6 +77,13 @@ pipe
   .create((set) => ({ ... }))
 ```
 
+評価結果は同一です:
+
+```ts
+// pipe は runtime でこれとまったく同じになります
+devtools(subscribeWithSelector(persist(immer(baseCreator), options)), options)
+```
+
 ### Before / After 比較
 
 | | Before (inside-out) | After (pipe) |
@@ -86,12 +93,23 @@ pipe
 | **`set` 型** | ネスト構造から推論 | builder chain が積み上げて計算 |
 | **middleware 追加** | 式全体を再度ラップ | 対応する wrapper 位置に `.use(...)` を挿入 |
 
-評価結果は同一です:
+### LLM で既存 store をリファクタリングする
 
-```ts
-// pipe は runtime でこれとまったく同じになります
-devtools(subscribeWithSelector(persist(immer(baseCreator), options)), options)
+大きな store をリファクタリングするときは、[`docs/llm-context.md`](../llm-context.md) を canonical LLM input として使ってください。使っている tool が file references をサポートしているなら `@docs/llm-context.md` を添付または mention し、サポートしていない場合はその document contents を store code より先に貼り付けます。
+
+```md
+Use `docs/llm-context.md` as the rules for this refactor.
+
+この Zustand store を `zustand-middleware-pipe` を使う形にリファクタリングしてください。
+
+- runtime behavior の preservation を最優先にしてください。
+- middleware wrapper order を変えないでください: outermost wrapper が先、base creator が最後です。
+- wrapper を同じ outside-to-inside order で `pipe.use(...)` に移してください。
+- innermost state creator を `.create(...)` に入れてください。
+- リファクタリング後に typecheck と relevant tests を実行してください。
 ```
+
+この context file には import rules、type caveats、before/after examples、safety checklist がまとまっています。これは `devtools(subscribeWithSelector(persist(immer(...))))` のように options が複数の indentation levels に散らばっている dense stack で特に有効です。
 
 ---
 

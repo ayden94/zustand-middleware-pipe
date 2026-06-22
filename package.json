@@ -1,6 +1,6 @@
 {
   "name": "zustand-middleware-pipe",
-  "version": "0.1.0-beta.4",
+  "version": "0.1.0",
   "description": "Experimental userland helper for composing Zustand middlewares left-to-right.",
   "type": "module",
   "license": "MIT",
@@ -24,6 +24,7 @@
   },
   "files": [
     "dist",
+    "docs/llm-context.md",
     "docs/i18n"
   ],
   "exports": {
