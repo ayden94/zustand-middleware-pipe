@@ -93,12 +93,25 @@ devtools(subscribeWithSelector(persist(immer(baseCreator), options)), options)
 | **`set` 타입** | 중첩 구조에서 추론 | builder chain이 누적하여 계산 |
 | **미들웨어 추가** | 전체 표현식을 다시 감쌈 | 대응되는 wrapper 위치에 `.use(...)` 삽입 |
 
-### LLM으로 기존 store 리팩터링하기
+---
 
-큰 store를 리팩터링할 때는 [`docs/llm-context.md`](../llm-context.md)를 LLM 입력용 기준 문서로 사용하세요. 사용하는 도구가 파일 참조를 지원하면 `@docs/llm-context.md`를 첨부하거나 멘션하고, 지원하지 않으면 해당 문서 내용을 store 코드보다 먼저 붙여넣으면 됩니다.
+## LLM으로 기존 store 리팩터링하기
+
+큰 store를 리팩터링할 때는 [`docs/llm-context.md`](../llm-context.md)를 LLM 입력용 기준 문서로 사용하세요. 이 저장소 밖에서 복사해 쓰는 프롬프트에는 raw GitHub URL인 `https://raw.githubusercontent.com/zustandjs/zustand-middleware-pipe/refs/heads/main/docs/llm-context.md`를 사용하세요. 이 문서는 package import 규칙, middleware 순서 규칙, 타입 주의사항, before/after 예시, 안전 체크리스트를 한곳에 모아둔 문서입니다.
+
+사용하는 도구가 파일 참조를 지원하면 `@docs/llm-context.md`를 첨부하거나 멘션하고, 지원하지 않으면 raw URL을 제공하거나 해당 문서 내용을 store 코드보다 먼저 붙여넣으면 됩니다. 이 방식은 `devtools(subscribeWithSelector(persist(immer(...))))`처럼 option이 여러 들여쓰기 레벨에 흩어진 dense stack에서 특히 효과적입니다.
+
+모델에는 런타임 동작 보존을 최우선으로 요청하세요:
+
+- 기존 middleware wrapper 순서를 바꾸지 마세요.
+- state shape, action name, persistence key, storage, migration, devtools option을 보존하세요.
+- `combine(...)`과 `redux(...)`가 가장 안쪽 state creator helper라면 `.create(...)` 안에 그대로 두세요.
+- 실제로 사용하는 import만 추가하세요.
+- 리팩터링 후 typecheck와 관련 test를 실행하세요.
 
 ```md
-`docs/llm-context.md`를 이 리팩터링의 규칙으로 사용해줘.
+먼저 아래 LLM context를 읽고 이 리팩터링의 규칙으로 사용해줘:
+https://raw.githubusercontent.com/zustandjs/zustand-middleware-pipe/refs/heads/main/docs/llm-context.md
 
 이 Zustand store를 `zustand-middleware-pipe`를 사용하도록 리팩터링해줘.
 
@@ -109,7 +122,7 @@ devtools(subscribeWithSelector(persist(immer(baseCreator), options)), options)
 - 리팩터링 후 typecheck와 관련 test를 실행해줘.
 ```
 
-이 컨텍스트 문서는 import 규칙, 타입 주의사항, before/after 예시, 안전 체크리스트를 담고 있습니다. 이 방식은 `devtools(subscribeWithSelector(persist(immer(...))))`처럼 option이 여러 들여쓰기 레벨에 흩어진 dense stack에서 특히 효과적입니다.
+단순하고 잘 동작하는 store를 이 helper를 쓰기 위해 억지로 다시 작성할 필요는 없습니다. 기존 middleware stack이 읽기 어렵거나 손으로 고치기 쉬운 실수가 많을 때 LLM context를 사용하세요.
 
 ---
 

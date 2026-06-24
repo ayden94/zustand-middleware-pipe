@@ -7,11 +7,11 @@
   "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ayden94/zustand-middleware-pipe.git"
+    "url": "git+https://github.com/zustandjs/zustand-middleware-pipe.git"
   },
-  "homepage": "https://github.com/ayden94/zustand-middleware-pipe#readme",
+  "homepage": "https://github.com/zustandjs/zustand-middleware-pipe#readme",
   "bugs": {
-    "url": "https://github.com/ayden94/zustand-middleware-pipe/issues"
+    "url": "https://github.com/zustandjs/zustand-middleware-pipe/issues"
   },
   "keywords": [
     "zustand",

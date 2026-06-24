@@ -93,12 +93,25 @@ devtools(subscribeWithSelector(persist(immer(baseCreator), options)), options)
 | **`set` 型** | ネスト構造から推論 | builder chain が積み上げて計算 |
 | **middleware 追加** | 式全体を再度ラップ | 対応する wrapper 位置に `.use(...)` を挿入 |
 
-### LLM で既存 store をリファクタリングする
+---
 
-大きな store をリファクタリングするときは、[`docs/llm-context.md`](../llm-context.md) を canonical LLM input として使ってください。使っている tool が file references をサポートしているなら `@docs/llm-context.md` を添付または mention し、サポートしていない場合はその document contents を store code より先に貼り付けます。
+## LLM で既存 store をリファクタリングする
+
+大きな store をリファクタリングするときは、[`docs/llm-context.md`](../llm-context.md) を canonical LLM input として使ってください。この repository の外で copy/paste prompt として使う場合は、raw GitHub URL の `https://raw.githubusercontent.com/zustandjs/zustand-middleware-pipe/refs/heads/main/docs/llm-context.md` を使ってください。この document は package import rules、middleware order rules、type caveats、before/after examples、safety checklist を一か所にまとめています。
+
+使っている tool が file references をサポートしているなら `@docs/llm-context.md` を添付または mention し、サポートしていない場合は raw URL を渡すか、その document contents を store code より先に貼り付けます。これは `devtools(subscribeWithSelector(persist(immer(...))))` のように options が複数の indentation levels に散らばっている dense stack で特に有効です。
+
+モデルには runtime behavior の preservation を最優先に依頼してください:
+
+- 既存の middleware wrapper order を変えないでください。
+- state shape、action names、persistence keys、storage、migrations、devtools options を保持してください。
+- `combine(...)` と `redux(...)` が innermost state creator helper なら `.create(...)` の中に残してください。
+- 実際に使う imports だけを追加してください。
+- リファクタリング後に typecheck と relevant tests を実行してください。
 
 ```md
-Use `docs/llm-context.md` as the rules for this refactor.
+Read this LLM context first and use it as the rules for this refactor:
+https://raw.githubusercontent.com/zustandjs/zustand-middleware-pipe/refs/heads/main/docs/llm-context.md
 
 この Zustand store を `zustand-middleware-pipe` を使う形にリファクタリングしてください。
 
@@ -109,7 +122,7 @@ Use `docs/llm-context.md` as the rules for this refactor.
 - リファクタリング後に typecheck と relevant tests を実行してください。
 ```
 
-この context file には import rules、type caveats、before/after examples、safety checklist がまとまっています。これは `devtools(subscribeWithSelector(persist(immer(...))))` のように options が複数の indentation levels に散らばっている dense stack で特に有効です。
+単純で問題なく動いている store を、この helper のためだけに書き換える必要はありません。既存の middleware stack が読みにくい、または手作業で壊しやすい場合に LLM context を使ってください。
 
 ---
 

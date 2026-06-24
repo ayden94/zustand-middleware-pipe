@@ -93,12 +93,25 @@ devtools(subscribeWithSelector(persist(immer(baseCreator), options)), options)
 | **`set` type** | Inferred by nesting | Accumulated by the builder chain |
 | **Adding middleware** | Wrap the whole expression again | Insert `.use(...)` at the matching wrapper position |
 
-### Refactoring existing stores with an LLM
+---
 
-For larger stores, use [`docs/llm-context.md`](docs/llm-context.md) as the canonical LLM input. If your tool supports file references, attach or mention `@docs/llm-context.md`; otherwise paste the document contents before the store code.
+## Refactoring existing stores with an LLM
+
+For larger stores, use [`docs/llm-context.md`](docs/llm-context.md) as the canonical LLM input. For copy/paste prompts outside this repository, use the raw GitHub URL: `https://raw.githubusercontent.com/zustandjs/zustand-middleware-pipe/refs/heads/main/docs/llm-context.md`. It gives the model the package import rules, middleware order rules, type caveats, before/after examples, and safety checklist in one place.
+
+If your tool supports file references, attach or mention `@docs/llm-context.md`; otherwise provide the raw URL or paste the document contents before the store code. This is most useful for dense stacks such as `devtools(subscribeWithSelector(persist(immer(...))))`, where options are scattered across several indentation levels.
+
+Ask the model to preserve behavior first:
+
+- Keep the existing middleware wrapper order unchanged.
+- Preserve state shape, action names, persistence keys, storage, migrations, and devtools options.
+- Keep `combine(...)` and `redux(...)` inside `.create(...)` when they are the innermost state creator helper.
+- Add only the imports that are actually used.
+- Run typecheck and relevant tests after the refactor.
 
 ```md
-Use `docs/llm-context.md` as the rules for this refactor.
+Read this LLM context first and use it as the rules for this refactor:
+https://raw.githubusercontent.com/zustandjs/zustand-middleware-pipe/refs/heads/main/docs/llm-context.md
 
 Refactor this Zustand store to use `zustand-middleware-pipe`.
 
@@ -109,7 +122,7 @@ Refactor this Zustand store to use `zustand-middleware-pipe`.
 - Run typecheck and relevant tests after the refactor.
 ```
 
-The context file contains the full import rules, type caveats, before/after examples, and safety checklist. This works best for dense stacks like `devtools(subscribeWithSelector(persist(immer(...))))`, where options are scattered across several indentation levels.
+Do not rewrite a simple working store just to use this helper. Reach for the LLM context when the existing middleware stack is hard to read or easy to break by hand.
 
 ---
 
