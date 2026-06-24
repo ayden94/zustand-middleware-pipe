@@ -16,7 +16,7 @@ npm install zustand-middleware-pipe zustand
 
 ```ts
 import { create } from 'zustand'
-import { definePipeableMiddleware, pipe } from 'zustand-middleware-pipe'
+import { pipe } from 'zustand-middleware-pipe'
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
 import { devtools, persist, subscribeWithSelector } from 'zustand-middleware-pipe/middleware'
 
@@ -369,8 +369,7 @@ npm run verify
 Vite React 예제는 `examples/`에 있으며, local `file:..` dependency로 이 패키지를 사용합니다.
 
 ```sh
-npm run example:install
 npm run example:dev
 ```
 
-패키지 root에서 `npm run example:verify`를 실행하면 예제를 build하고 lint합니다.
+`npm run example:dev`는 예제를 시작하기 전에 local package를 다시 build하고 link합니다. 패키지 root에서 `npm run example:verify`를 실행하면 예제를 build하고 lint합니다.
