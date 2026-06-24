@@ -5,7 +5,7 @@ This Vite app exercises the local `zustand-middleware-pipe` package with routed 
 It demonstrates the recommended middleware imports:
 
 ```ts
-import { definePipeableMiddleware, pipe } from 'zustand-middleware-pipe'
+import { pipe } from 'zustand-middleware-pipe'
 import {
   combine,
   createJSONStorage,
@@ -30,8 +30,7 @@ The app includes:
 Run it from the repository root:
 
 ```sh
-npm run example:install
 npm run example:dev
 ```
 
-Use `npm run example:verify` to rebuild the local package, install it into this example, build the Vite app, and run ESLint.
+`npm run example:dev` rebuilds and links the local package before starting Vite. Use `npm run example:verify` to rebuild the local package, install it into this example, build the Vite app, and run ESLint.

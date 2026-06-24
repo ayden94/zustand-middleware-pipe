@@ -16,7 +16,7 @@ npm install zustand-middleware-pipe zustand
 
 ```ts
 import { create } from 'zustand'
-import { definePipeableMiddleware, pipe } from 'zustand-middleware-pipe'
+import { pipe } from 'zustand-middleware-pipe'
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
 import { devtools, persist, subscribeWithSelector } from 'zustand-middleware-pipe/middleware'
 
@@ -370,8 +370,7 @@ npm run verify
 Vite React のサンプルは `examples/` にあり、local `file:..` dependency でこの package を使っています。
 
 ```sh
-npm run example:install
 npm run example:dev
 ```
 
-package root から `npm run example:verify` を実行すると、サンプルを build して lint します。
+`npm run example:dev` はサンプルを起動する前に local package を rebuild して link します。package root から `npm run example:verify` を実行すると、サンプルを build して lint します。

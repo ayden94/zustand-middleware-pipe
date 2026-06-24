@@ -16,7 +16,7 @@ npm install zustand-middleware-pipe zustand
 
 ```ts
 import { create } from 'zustand'
-import { definePipeableMiddleware, pipe } from 'zustand-middleware-pipe'
+import { pipe } from 'zustand-middleware-pipe'
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
 import { devtools, persist, subscribeWithSelector } from 'zustand-middleware-pipe/middleware'
 
@@ -369,8 +369,7 @@ npm run verify
 The Vite React example lives in `examples/` and uses this package through a local `file:..` dependency.
 
 ```sh
-npm run example:install
 npm run example:dev
 ```
 
-Use `npm run example:verify` to build and lint the example from the package root.
+`npm run example:dev` rebuilds and links the local package before starting the example. Use `npm run example:verify` to build and lint the example from the package root.
