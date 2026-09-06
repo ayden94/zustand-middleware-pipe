@@ -144,6 +144,8 @@ The pipe wrappers preserve those underlying Zustand middleware capabilities. For
 
 Use explicit generics when they clarify persisted or temporal state:
 
+For zundo, use `temporal<FullStoreState>()` unless an annotated options callback or explicit middleware type supplies full-state inference. For projected history, use `temporal<FullStoreState, HistoryState>(options)`. A later `.create(...)` does not infer history retroactively, and options such as `limit` provide no state inference. A no-options call without an inferred state uses the deprecated compatibility overload with unknown history. Keep the full store type in the first generic and the history subset in the second; snapshots remain `Partial<HistoryState>[]`.
+
 ```ts
 type PersistedCounterState = Pick<CounterState, 'count'>
 

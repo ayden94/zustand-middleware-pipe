@@ -162,7 +162,7 @@ pipe.use(devtools(options?))
 
 ```ts
 immer()
-temporal(options?)              // use from /middleware/zundo
+temporal<TState, UState = TState>(options?) // use from /middleware/zundo
 persist<T, PersistedState = T, PersistReturn = unknown>(options)
 subscribeWithSelector()
 devtools(options?)
@@ -235,7 +235,7 @@ pipe
 
 ### `zundo` temporal history
 
-Use the zundo subpath when you want undo/redo history. Install `zundo` separately, then add `temporal()` to the pipe:
+Use the zundo subpath when you want undo/redo history. Install `zundo` separately, then add `temporal<CounterState>()` to the pipe:
 
 ```ts
 import { temporal } from 'zustand-middleware-pipe/middleware/zundo'
@@ -252,7 +252,13 @@ const useCounterStore = create<CounterState>()(
 useCounterStore.temporal.getState().undo()
 ```
 
-`temporal()` keeps zundo's own mutator typing, including `store.temporal`. If you also persist the main store or the temporal store, follow zundo's `wrapTemporal` guidance; this package does not infer a universal safe order for every zundo + persistence setup.
+`temporal<CounterState>()` keeps zundo's own mutator typing, including `store.temporal`. Supply the full store state as the first generic unless a typed options callback or an explicit middleware type provides that inference. The later `.create(...)` call does not infer the history type retroactively.
+
+For partial history, use `temporal<CounterState, Pick<CounterState, 'count'>>({ partialize: (state) => ({ count: state.count }) })`. `pastStates` and `futureStates` are arrays of `Partial<UState>`. `partialize` receives the full state; `equality` receives `UState`, and `diff` receives `Partial<UState>`. The adapter preserves upstream option declarations: zundo 2.3.0 types `onSave` with the full state but passes projected values at runtime when `partialize` is used, so do not rely on excluded fields in that callback.
+
+Bare `temporal()` with no inferred full-state type remains supported for compatibility but is deprecated in editor hints because its history state is `unknown`. Options such as `{ limit: 50 }` do not provide a state inference source either; use `temporal<CounterState>({ limit: 50 })`. Generic factories returning `temporal<T>()`, annotated callbacks, and explicit middleware type contexts remain supported.
+
+If you also persist the main store or the temporal store, follow zundo's `wrapTemporal` guidance; this package does not infer a universal safe order for every zundo + persistence setup.
 
 You can also use `pipe` inside `wrapTemporal` when you want to persist the undo/redo history store itself:
 

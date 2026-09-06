@@ -162,7 +162,7 @@ pipe.use(devtools(options?))
 
 ```ts
 immer()
-temporal(options?)              // /middleware/zundo から使用
+temporal<TState, UState = TState>(options?) // /middleware/zundo から使用
 persist<T, PersistedState = T, PersistReturn = unknown>(options)
 subscribeWithSelector()
 devtools(options?)
@@ -236,7 +236,7 @@ pipe
 
 ### `zundo` temporal history
 
-undo/redo history が必要な場合は zundo subpath を使います。`zundo` を別途インストールしてから、pipe に `temporal()` を追加します:
+undo/redo history が必要な場合は zundo subpath を使います。`zundo` を別途インストールしてから、pipe に `temporal<CounterState>()` を追加します:
 
 ```ts
 import { temporal } from 'zustand-middleware-pipe/middleware/zundo'
@@ -253,7 +253,13 @@ const useCounterStore = create<CounterState>()(
 useCounterStore.temporal.getState().undo()
 ```
 
-`temporal()` は `store.temporal` を含む zundo の mutator typing を維持します。main store や temporal store を persist する場合は、zundo の `wrapTemporal` guidance に従ってください。この package は、すべての zundo + persistence 構成に対して単一の安全な順序を推論しません。
+`temporal<CounterState>()` は `store.temporal` を含む zundo の mutator typing を維持します。型付きの options コールバックやミドルウェアの明示的な型から状態を推論できない場合は、最初の型引数に store 全体の状態を指定してください。後続の `.create(...)` は history の型を遡って推論しません。
+
+部分的な history には `temporal<CounterState, Pick<CounterState, 'count'>>({ partialize: (state) => ({ count: state.count }) })` を使います。`pastStates` と `futureStates` は `Partial<UState>` の配列です。`partialize` は全体の状態、`equality` は `UState`、`diff` は `Partial<UState>` を受け取ります。adapter は upstream の options 宣言を維持します。zundo 2.3.0 は `onSave` を全体の状態として型付けしますが、`partialize` を使うと実際には部分的な状態を渡すため、このコールバックでは除外されたフィールドに依存しないでください。
+
+全体の状態を推論する文脈がない `temporal()` は互換性のために維持しますが、history の状態が `unknown` になるため、エディターで deprecated と表示します。`{ limit: 50 }` のような options だけでも状態を推論できないため、`temporal<CounterState>({ limit: 50 })` を使ってください。`temporal<T>()` を返すジェネリックな factory、型を明示したコールバック、ミドルウェアの明示的な型の文脈は引き続きサポートします。
+
+main store や temporal store を persist する場合は、zundo の `wrapTemporal` guidance に従ってください。この package は、すべての zundo + persistence 構成に対して単一の安全な順序を推論しません。
 
 undo/redo history store 自体を persist したい場合は、`wrapTemporal` の中でもう一度 `pipe` を使えます:
 

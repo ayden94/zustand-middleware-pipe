@@ -11,6 +11,13 @@ type ZundoProducedMutator<UState> = [
   StoreApi<TemporalState<UState>>,
 ]
 
+/** @deprecated Supply temporal<State>() for typed history. */
+export function temporal<TState = unknown>(
+  ..._untyped: unknown extends TState ? [] : [stateType: never]
+): PipeMiddleware<TState, [], [ZundoProducedMutator<TState>]>
+export function temporal<TState, UState = TState>(
+  options?: ZundoOptions<TState, UState>,
+): PipeMiddleware<TState, [], [ZundoProducedMutator<UState>]>
 export function temporal<TState, UState = TState>(
   options?: ZundoOptions<TState, UState>,
 ): PipeMiddleware<
