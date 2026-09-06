@@ -886,6 +886,64 @@ describe('pipe', () => {
     expect(thrown.message).toContain('cannot be added more than once')
   })
 
+  it.each([
+    ['reject', 'allow'],
+    ['allow', 'reject'],
+  ] as const)(
+    'rejects conflicting duplicate policies (%s then %s)',
+    (firstPolicy, secondPolicy) => {
+      // Given the same id with conflicting explicit policies.
+      const first = createPipeableOrderMarkerMiddleware<{ count: number }>(
+        'first',
+        [],
+        { id: 'test/conflicting-duplicate', duplicate: firstPolicy },
+      )
+      const second = createPipeableOrderMarkerMiddleware<{ count: number }>(
+        'second',
+        [],
+        { id: 'test/conflicting-duplicate', duplicate: secondPolicy },
+      )
+      const builder = pipe.use(first)
+
+      // When either ordering attempts to add the second instance.
+      const addDuplicate = () => builder.use(second)
+
+      // Then either instance's reject policy is respected.
+      expect(addDuplicate).toThrow(TypeError)
+    },
+  )
+
+  it('preserves a reusable allow-policy builder after a rejected branch', () => {
+    // Given an allow-policy base and a conflicting branch.
+    const events: string[] = []
+    const repeatable = createPipeableOrderMarkerMiddleware<{ count: number }>(
+      'repeatable',
+      events,
+      { id: 'test/reusable-duplicate', duplicate: 'allow' },
+    )
+    const rejecting = createPipeableOrderMarkerMiddleware<{ count: number }>(
+      'rejecting',
+      events,
+      { id: 'test/reusable-duplicate', duplicate: 'reject' },
+    )
+    const builder = pipe.use(repeatable)
+    expect(() => builder.use(rejecting)).toThrow(TypeError)
+
+    // When the original builder is reused for a valid repeated middleware.
+    const store = createStore<{ count: number }>()(
+      builder.use(repeatable).create(() => ({ count: 0 })),
+    )
+
+    // Then the failed branch has not changed the accepted middleware chain.
+    expect(store.getState().count).toBe(0)
+    expect(events).toEqual([
+      'repeatable:before',
+      'repeatable:before',
+      'repeatable:after',
+      'repeatable:after',
+    ])
+  })
+
   it('allows duplicate pipeable middleware ids with duplicate allow policy', () => {
     const events: string[] = []
     const first = createPipeableOrderMarkerMiddleware<{ count: number }>(

@@ -344,6 +344,8 @@ pipe
 
 `order.before` and `order.after` are checked only against ids that are present in the current pipe chain. Unknown or absent targets are ignored, cycles are rejected, and reserved built-in ids such as `zustand/persist` cannot be reused by public userland metadata.
 
+Repeated ids are allowed only when every instance explicitly uses `duplicate: 'allow'`. The default is `'reject'`; any rejecting instance prevents repetition, regardless of insertion order.
+
 ---
 
 ## Important caveats
