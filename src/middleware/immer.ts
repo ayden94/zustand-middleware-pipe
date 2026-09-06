@@ -5,8 +5,8 @@ import type {
   ImmerMutator,
   MutatorTuple,
   PipeAnyMiddleware,
-} from '../types'
-import { defineBuiltInPipeableMiddleware } from '../middleware-metadata'
+} from '../types.js'
+import { defineBuiltInPipeableMiddleware } from '../middleware-metadata.js'
 
 export function immer(): PipeAnyMiddleware<
   [ImmerMutator],

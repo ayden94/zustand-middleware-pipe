@@ -1,4 +1,4 @@
-import type { PipeableMiddlewareMetadata } from './types'
+import type { PipeableMiddlewareMetadata } from './types.js'
 
 export type BuiltInMiddlewareKind =
   | 'devtools'

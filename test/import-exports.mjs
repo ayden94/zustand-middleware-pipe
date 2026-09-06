@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 async function readText(path) {
   return readFile(new URL(path, import.meta.url), 'utf8')
@@ -124,6 +125,70 @@ assert.deepEqual(middlewareRuntimeKeys, [
   'subscribeWithSelector',
 ])
 assert.deepEqual(zundoRuntimeKeys, ['temporal'])
+
+const consumerPath = fileURLToPath(new URL('./package-consumer.mts', import.meta.url))
+const consumerSource = `
+  import { createStore } from 'zustand/vanilla'
+  import { pipe } from 'zustand-middleware-pipe'
+  import { devtools, persist, subscribeWithSelector } from 'zustand-middleware-pipe/middleware'
+  import { immer } from 'zustand-middleware-pipe/middleware/immer'
+  import { temporal } from 'zustand-middleware-pipe/middleware/zundo'
+  type State = { count: number; inc: () => void }
+  const store = createStore<State>()(
+    pipe
+      .use(devtools({ enabled: false }))
+      .use(subscribeWithSelector())
+      .use(persist<State, Pick<State, 'count'>>({
+        name: 'consumer',
+        partialize: (state) => ({ count: state.count }),
+      }))
+      .use(immer())
+      .create((set) => ({
+        count: 0,
+        inc: () => set((state) => { state.count += 1 }, false, 'counter/inc'),
+      })),
+  )
+  store.subscribe((state) => state.count, (count) => {
+    const selected: number = count
+  })
+  const history = createStore<State>()(
+    pipe.use(temporal<State>()).create((set) => ({
+      count: 0,
+      inc: () => set((state) => ({ count: state.count + 1 })),
+    })),
+  )
+  const previousCount: number | undefined =
+    history.temporal.getState().pastStates[0]?.count
+`
+
+for (const [name, module, moduleResolution] of [
+  ['bundler', ts.ModuleKind.ESNext, ts.ModuleResolutionKind.Bundler],
+  ['NodeNext', ts.ModuleKind.NodeNext, ts.ModuleResolutionKind.NodeNext],
+]) {
+  const options = {
+    strict: true,
+    noEmit: true,
+    skipLibCheck: false,
+    target: ts.ScriptTarget.ES2022,
+    types: [],
+    module,
+    moduleResolution,
+  }
+  const host = ts.createCompilerHost(options)
+  const getSourceFile = host.getSourceFile.bind(host)
+  host.getSourceFile = (path, languageVersion, ...args) =>
+    path === consumerPath
+      ? ts.createSourceFile(path, consumerSource, languageVersion, true)
+      : getSourceFile(path, languageVersion, ...args)
+  const program = ts.createProgram([consumerPath], options, host)
+  const diagnostics = ts.getPreEmitDiagnostics(program).map((diagnostic) => ({
+    code: diagnostic.code,
+    file: diagnostic.file?.fileName,
+    message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+  }))
+  assert.deepEqual(diagnostics, [], `${name} must resolve the public declarations`)
+  console.log(`PUBLIC_TYPES_PASS ${name}`)
+}
 
 if (process.env.TASK14_ROOT_EXPORTS_PATH) {
   await writeFile(

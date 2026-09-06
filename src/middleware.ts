@@ -1,9 +1,9 @@
-export { combine } from './middleware/combine'
-export { definePipeableMiddleware } from './pipeable-middleware'
-export { devtools } from './middleware/devtools'
-export { persist } from './middleware/persist'
-export { redux } from './middleware/redux'
-export { subscribeWithSelector } from './middleware/subscribe-with-selector'
+export { combine } from './middleware/combine.js'
+export { definePipeableMiddleware } from './pipeable-middleware.js'
+export { devtools } from './middleware/devtools.js'
+export { persist } from './middleware/persist.js'
+export { redux } from './middleware/redux.js'
+export { subscribeWithSelector } from './middleware/subscribe-with-selector.js'
 export { createJSONStorage } from 'zustand/middleware'
 export type {
   DevtoolsOptions,
@@ -18,4 +18,4 @@ export type {
   PipeMiddlewareDuplicatePolicy,
   PipeMiddlewareId,
   PipeMiddlewareOrderMetadata,
-} from './types'
+} from './types.js'
