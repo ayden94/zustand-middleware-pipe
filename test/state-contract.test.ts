@@ -9,8 +9,15 @@ const consumerPath = fileURLToPath(
 function checkConsumer(body: string) {
   const source = `
     import { createStore, type StateCreator } from 'zustand/vanilla'
-    import { pipe, type PipeMiddleware } from '../src/index'
+    import {
+      pipe,
+      type PipeMiddleware,
+      type PipeAnyMiddleware,
+      type DevtoolsMutator,
+      type ImmerMutator,
+    } from '../src/index'
     import { devtools } from '../src/middleware'
+    import { immer } from '../src/middleware/immer'
 
     type Base = { count: number }
     type Sub = Base & { label: string }
@@ -42,7 +49,43 @@ function checkConsumer(body: string) {
   }))
 }
 
-describe('pipe state contracts', () => {
+describe('pipe state and mutator contracts', () => {
+  it('rejects reversed built-ins inside one correctly typed compound middleware', () => {
+    // Given a real wrapper whose produced tuple reverses built-in order.
+    const source = `
+      type Reversed = [ImmerMutator, DevtoolsMutator]
+      const compound: PipeAnyMiddleware<Reversed, Reversed> = (initializer) =>
+        immer()(devtools({ enabled: false })(initializer))
+      pipe.use(compound)
+    `
+
+    // When the compound wrapper crosses the public use() boundary.
+    const diagnostics = checkConsumer(source)
+
+    // Then the invalid order is rejected even within a single produced tuple.
+    expect(diagnostics).toEqual([{ code: 2769, file: consumerPath }])
+  })
+
+  it('preserves valid compound middleware state and setState capabilities', () => {
+    // Given the matching outer-to-inner compound middleware.
+    const source = `
+      type Ordered = [DevtoolsMutator, ImmerMutator]
+      const compound: PipeAnyMiddleware<Ordered, Ordered> = (initializer) =>
+        devtools({ enabled: false })(immer()(initializer))
+      const store = createStore<Base>()(
+        pipe.use(compound).create(() => ({ count: 0 })),
+      )
+      store.setState((state) => { state.count += 1 }, false, 'counter/inc')
+      const count: number = store.getState().count
+    `
+
+    // When the returned store uses draft updates and action labels together.
+    const diagnostics = checkConsumer(source)
+
+    // Then both mutator capabilities and the concrete state remain available.
+    expect(diagnostics).toEqual([])
+  })
+
   it('rejects an initializer that requires fields a selected store can replace', () => {
     // Given an initializer whose get() requires more than the selected state.
     const source = `
