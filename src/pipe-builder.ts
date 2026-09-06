@@ -5,7 +5,7 @@ import {
   getPipeableMiddlewareMetadata,
   type BuiltInMiddlewareKind,
   type PipeableMiddlewareRuntimeMetadata,
-} from './middleware-metadata'
+} from './middleware-metadata.js'
 import type {
   MutatorTuple,
   PipeApply,
@@ -17,7 +17,7 @@ import type {
   PipeMiddleware,
   PipeResolvedState,
   PipeStateCompatibility,
-} from './types'
+} from './types.js'
 
 const builtInMiddlewareOrder: BuiltInMiddlewareKind[] = [
   'devtools',

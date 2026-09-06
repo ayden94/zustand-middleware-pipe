@@ -151,7 +151,7 @@ Install `zundo` only if your stack includes `temporal()`:
 npm install zundo
 ```
 
-This package is **ESM-only** and assumes bundler-style module resolution for its internal relative imports.
+This package is **ESM-only** and supports TypeScript's `bundler` and `NodeNext` module resolution.
 
 ---
 
@@ -360,7 +360,7 @@ Repeated ids are allowed only when every instance explicitly uses `duplicate: 'a
 
 - **Not official Zustand guidance.** This is a userland experiment.
 - **Do not rewrite working stores** just to use this helper.
-- **Bundler resolution is expected.** The package is emitted as ESM with extensionless internal relative imports, so consume it through a bundler-compatible toolchain.
+- **Native ESM paths.** Runtime JavaScript and declarations use explicit `.js` relative specifiers. Native Node imports and both `NodeNext` and bundler TypeScript consumers are supported.
 - **Built-in wrapper order and duplicates are enforced.** Add package-provided wrappers outer-to-inner: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. TypeScript and the runtime `.use(...)` boundary reject reversed built-in order and duplicate package built-ins.
 - **Runtime guards are scoped to tagged pipeable wrappers.** Package built-ins (`devtools`, `subscribeWithSelector`, `persist`, `immer`) and opt-in adapters such as `zundo` carry explicit metadata for duplicate/order checks. Arbitrary untagged, userland, or third-party middleware is not introspected for order or duplicates.
 - **Userland order metadata is opt-in.** `definePipeableMiddleware` only trusts explicit ids and `order.before` / `order.after` hints. It does not inspect function names or source code, and it does not make arbitrary third-party middleware automatically safe.

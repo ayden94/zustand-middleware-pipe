@@ -1,5 +1,5 @@
-import { defineUserlandPipeableMiddleware } from './middleware-metadata'
-import type { PipeableMiddlewareMetadata } from './types'
+import { defineUserlandPipeableMiddleware } from './middleware-metadata.js'
+import type { PipeableMiddlewareMetadata } from './types.js'
 
 type MiddlewareFunction = (...args: never[]) => unknown
 

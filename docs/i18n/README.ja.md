@@ -151,7 +151,7 @@ npm install immer
 npm install zundo
 ```
 
-この package は **ESM-only** で、内部の相対 import には bundler-style module resolution を前提とします。
+この package は **ESM-only** で、TypeScript の `bundler` と `NodeNext` module resolution をサポートします。
 
 ---
 
@@ -361,7 +361,7 @@ pipe
 
 - **公式 Zustand guidance ではありません。** これは userland の実験です。
 - **すでに動いている store を書き直さないでください。**
-- **Bundler resolution を前提とします。** この package は extensionless な内部相対 import を持つ ESM として emit されるため、bundler-compatible toolchain 経由で使用してください。
+- **Native ESM のパスを使います。** Runtime JavaScript と宣言ファイルの相対パスに `.js` を明示します。Native Node import と、TypeScript の `NodeNext`、bundler の両方の利用環境をサポートします。
 - **built-in wrapper の順序と重複は強制されます。** package が提供する wrapper は outer-to-inner の順で追加してください: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. TypeScript と runtime の `.use(...)` 境界は、逆順の built-in wrapper と重複した package built-in を拒否します。
 - **runtime guard は tag 付きの pipeable wrapper に限定されます。** package built-in (`devtools`, `subscribeWithSelector`, `persist`, `immer`) と `zundo` のような opt-in adapter は、重複/順序検査用の明示的な metadata を持ちます。任意の untagged、userland、third-party middleware の順序や重複は introspect しません。
 - **Userland order metadata は opt-in です。** `definePipeableMiddleware` は明示的な id と `order.before` / `order.after` hint だけを信頼します。関数名や source code は introspect せず、任意の third-party middleware を自動的に安全にするものではありません。

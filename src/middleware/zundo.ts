@@ -2,8 +2,8 @@ import { temporal as zundoTemporal } from 'zundo'
 import type { TemporalState, Zundo, ZundoOptions } from 'zundo'
 import type {} from 'zundo'
 import type { StateCreator, StoreApi } from 'zustand/vanilla'
-import { defineUserlandPipeableMiddleware } from '../middleware-metadata'
-import type { MutatorTuple, PipeMiddleware } from '../types'
+import { defineUserlandPipeableMiddleware } from '../middleware-metadata.js'
+import type { MutatorTuple, PipeMiddleware } from '../types.js'
 
 type ZundoInputMutator = ['temporal', unknown]
 type ZundoProducedMutator<UState> = [

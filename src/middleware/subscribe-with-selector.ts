@@ -5,8 +5,8 @@ import type {
   MutatorTuple,
   PipeAnyMiddleware,
   SubscribeWithSelectorMutator,
-} from '../types'
-import { defineBuiltInPipeableMiddleware } from '../middleware-metadata'
+} from '../types.js'
+import { defineBuiltInPipeableMiddleware } from '../middleware-metadata.js'
 
 export function subscribeWithSelector(): PipeAnyMiddleware<
   [SubscribeWithSelectorMutator],

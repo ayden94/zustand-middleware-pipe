@@ -26,7 +26,6 @@ for (const initialOutput of ['missing', 'stale']) {
           'tsconfig.json',
           'tsconfig.build.json',
           'src',
-          'scripts',
           'docs',
           'README.md',
           'LICENSE',

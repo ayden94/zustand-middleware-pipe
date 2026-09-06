@@ -151,7 +151,7 @@ npm install immer
 npm install zundo
 ```
 
-이 패키지는 **ESM-only**이며 내부 상대 import에는 bundler-style module resolution을 전제로 합니다.
+이 패키지는 **ESM-only**이며 TypeScript의 `bundler`와 `NodeNext` module resolution을 지원합니다.
 
 ---
 
@@ -360,7 +360,7 @@ pipe
 
 - **공식 Zustand guidance가 아닙니다.** 이것은 userland 실험입니다.
 - **이미 잘 동작하는 store는 다시 작성하지 마세요.**
-- **Bundler resolution을 전제로 합니다.** 이 패키지는 extensionless 내부 상대 import를 가진 ESM으로 emit되므로, bundler-compatible toolchain을 통해 사용하세요.
+- **Native ESM 경로를 사용합니다.** 런타임 JavaScript와 선언 파일의 상대 경로에 `.js`를 명시합니다. Native Node import와 TypeScript의 `NodeNext`, bundler 소비자 환경을 지원합니다.
 - **built-in wrapper 순서와 중복은 강제됩니다.** 패키지가 제공하는 wrapper는 outer-to-inner 순서로 추가해야 합니다: `.use(devtools(...))` → `.use(subscribeWithSelector())` → `.use(persist(...))` → `.use(immer())`. TypeScript와 런타임 `.use(...)` 경계는 뒤집힌 built-in 순서와 중복된 패키지 built-in을 거부합니다.
 - **런타임 guard는 tag가 붙은 pipeable wrapper에 한정됩니다.** 패키지 built-in(`devtools`, `subscribeWithSelector`, `persist`, `immer`)과 `zundo` 같은 opt-in adapter는 중복/순서 검사용 명시적 metadata를 가집니다. 임의의 untagged, userland, 서드파티 미들웨어는 순서나 중복을 introspect하지 않습니다.
 - **Userland order metadata는 opt-in입니다.** `definePipeableMiddleware`는 명시적인 id와 `order.before` / `order.after` hint만 신뢰합니다. 함수 이름이나 source code를 introspect하지 않으며, 임의의 서드파티 미들웨어를 자동으로 안전하게 만들지 않습니다.

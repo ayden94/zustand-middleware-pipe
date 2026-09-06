@@ -1,5 +1,5 @@
-export { definePipeableMiddleware } from './pipeable-middleware'
-export { pipe, type Pipe } from './pipe'
+export { definePipeableMiddleware } from './pipeable-middleware.js'
+export { pipe, type Pipe } from './pipe.js'
 export type {
   DevtoolsMutator,
   ImmerMutator,
@@ -13,4 +13,4 @@ export type {
   PipeMiddlewareOrderMetadata,
   PipeMiddleware,
   SubscribeWithSelectorMutator
-} from './types'
+} from './types.js'
