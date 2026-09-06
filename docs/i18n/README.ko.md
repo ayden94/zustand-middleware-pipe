@@ -162,7 +162,7 @@ pipe.use(devtools(options?))
 
 ```ts
 immer()
-temporal(options?)              // /middleware/zundo에서 사용
+temporal<TState, UState = TState>(options?) // /middleware/zundo에서 사용
 persist<T, PersistedState = T, PersistReturn = unknown>(options)
 subscribeWithSelector()
 devtools(options?)
@@ -235,7 +235,7 @@ pipe
 
 ### `zundo` temporal history
 
-undo/redo history가 필요하면 zundo subpath를 사용하세요. `zundo`를 별도로 설치한 뒤 pipe에 `temporal()`을 추가합니다:
+undo/redo history가 필요하면 zundo subpath를 사용하세요. `zundo`를 별도로 설치한 뒤 pipe에 `temporal<CounterState>()`를 추가합니다:
 
 ```ts
 import { temporal } from 'zustand-middleware-pipe/middleware/zundo'
@@ -252,7 +252,13 @@ const useCounterStore = create<CounterState>()(
 useCounterStore.temporal.getState().undo()
 ```
 
-`temporal()`은 `store.temporal`을 포함한 zundo의 mutator typing을 유지합니다. main store나 temporal store를 함께 persist한다면 zundo의 `wrapTemporal` 가이드를 따르세요. 이 패키지는 모든 zundo + persistence 조합에 대해 하나의 보편적인 안전 순서를 추론하지 않습니다.
+`temporal<CounterState>()`는 `store.temporal`을 포함한 zundo의 mutator typing을 유지합니다. 타입이 지정된 options 콜백이나 미들웨어의 명시적 타입에서 상태를 추론할 수 없다면 첫 번째 제네릭에 전체 store 상태를 지정하세요. 나중의 `.create(...)` 호출이 history 타입까지 소급해서 추론하지는 않습니다.
+
+부분 history에는 `temporal<CounterState, Pick<CounterState, 'count'>>({ partialize: (state) => ({ count: state.count }) })`를 사용하세요. `pastStates`와 `futureStates`는 `Partial<UState>` 배열입니다. `partialize`는 전체 상태를, `equality`는 `UState`를, `diff`는 `Partial<UState>`를 받습니다. 어댑터는 upstream 옵션 선언을 유지합니다. zundo 2.3.0은 `onSave`를 전체 상태 타입으로 선언하지만 `partialize`를 사용하면 실제로는 부분 상태를 전달하므로 이 콜백에서 제외된 필드에 의존하지 마세요.
+
+전체 상태 타입을 추론할 문맥이 없는 `temporal()`은 호환성을 위해 유지하지만 history 상태가 `unknown`이므로 편집기에서 deprecated 안내를 표시합니다. `{ limit: 50 }` 같은 옵션만으로도 상태를 추론할 수 없으므로 `temporal<CounterState>({ limit: 50 })`를 사용하세요. `temporal<T>()`를 반환하는 제네릭 팩토리, 타입이 명시된 콜백, 미들웨어의 명시적 타입 문맥은 계속 지원합니다.
+
+main store나 temporal store를 함께 persist한다면 zundo의 `wrapTemporal` 가이드를 따르세요. 이 패키지는 모든 zundo + persistence 조합에 대해 하나의 보편적인 안전 순서를 추론하지 않습니다.
 
 undo/redo history store 자체를 persist하고 싶다면 `wrapTemporal` 안에서도 다시 `pipe`를 사용할 수 있습니다:
 

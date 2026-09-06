@@ -787,22 +787,26 @@ describe('pipe', () => {
 
   it('composes the optional zundo temporal middleware subpath', () => {
     const store = createStore<Pick<CounterState, 'count' | 'inc'>>()(
-      pipe.use(temporal()).create((set) => ({
-        count: 0,
-        inc: () => {
-          set((state) => ({ count: state.count + 1 }))
-        },
-      })),
+      pipe
+        .use(temporal<Pick<CounterState, 'count' | 'inc'>>())
+        .create((set) => ({
+          count: 0,
+          inc: () => {
+            set((state) => ({ count: state.count + 1 }))
+          },
+        })),
     )
 
     store.getState().inc()
 
     expect(store.getState().count).toBe(1)
     expect(typeof store.temporal.getState().undo).toBe('function')
+    expect(store.temporal.getState().pastStates[0]?.count).toBe(0)
 
     store.temporal.getState().undo()
 
     expect(store.getState().count).toBe(0)
+    expect(store.temporal.getState().futureStates[0]?.count).toBe(1)
   })
 
   it('honors pipeable middleware order metadata for tagged userland middleware', () => {
