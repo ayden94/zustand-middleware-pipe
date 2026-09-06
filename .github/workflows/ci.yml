@@ -40,3 +40,28 @@ jobs:
 
       - name: Run verification
         run: npm run verify
+
+  example:
+    name: Example build and lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            examples/package-lock.json
+
+      - name: Install and build the library
+        run: npm ci && npm run build
+
+      - name: Install the example reproducibly
+        run: npm ci --prefix examples --install-links
+
+      - name: Build and lint the example
+        run: npm run build --prefix examples && npm run lint --prefix examples

@@ -48,7 +48,7 @@ import { temporal } from 'zustand-middleware-pipe/middleware/zundo'
 Only import optional adapters when used:
 
 - `zustand-middleware-pipe/middleware/immer` requires the app to have `immer` installed.
-- `zustand-middleware-pipe/middleware/zundo` requires the app to have `zundo` installed.
+- `zustand-middleware-pipe/middleware/zundo` requires `zundo` and React 18 or later because zundo currently imports Zustand's React entry point. Root/core middleware imports remain React-free for vanilla stores.
 
 ## Built-in order rules
 

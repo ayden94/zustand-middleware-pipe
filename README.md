@@ -151,6 +151,8 @@ Install `zundo` only if your stack includes `temporal()`:
 npm install zundo
 ```
 
+The zundo adapter currently imports Zustand's React entry point, so it also needs React 18 or later. React projects already provide it; in a vanilla project, install it with `npm install react` before importing the zundo adapter. The root and core middleware entry points do not require React for vanilla stores.
+
 This package is **ESM-only** and supports TypeScript's `bundler` and `NodeNext` module resolution.
 
 ---
