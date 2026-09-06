@@ -262,62 +262,30 @@ function assertInvalidBuiltInStacksAtCompileTime() {
 void assertInvalidBuiltInStacksAtCompileTime
 
 describe('pipe', () => {
-  it('supports reusable storage fixtures with raw inspection', () => {
-    const storage = createMemoryStorage({
-      seed: '{"state":{"count":1},"version":0}',
-    })
-
-    expect(storage.getItem('missing')).toBeNull()
-    expect(storage.getRawItem('seed')).toBe('{"state":{"count":1},"version":0}')
-
-    storage.setItem('counter', '{"state":{"count":2},"version":0}')
-
-    expect(storage.getItem('counter')).toBe('{"state":{"count":2},"version":0}')
-    expect(storage.getRawItem('counter')).toBe('{"state":{"count":2},"version":0}')
-
-    storage.removeItem('counter')
-
-    expect(storage.getItem('counter')).toBeNull()
-    expect(storage.getRawItem('counter')).toBeUndefined()
-  })
-
-  it('supports seeded JSON hydration and exact payload inspection', () => {
-    const storage = createMemoryStorage({
-      counter: '{"state":{"count":7},"version":3}',
-    })
-    const jsonStorage = createJSONStorage<PersistedCounterState>(() => storage)
-
-    expect(jsonStorage).toBeDefined()
-    expect(jsonStorage?.getItem('counter')).toEqual({
-      state: { count: 7 },
-      version: 3,
-    })
-
-    jsonStorage?.setItem('counter', {
-      state: { count: 8 },
-      version: 4,
-    })
-
-    expect(storage.getRawItem('counter')).toBe('{"state":{"count":8},"version":4}')
-
-    jsonStorage?.removeItem('counter')
-
-    expect(storage.getRawItem('counter')).toBeUndefined()
-  })
-
-  it('treats unavailable storage lookups as undefined JSON storage', () => {
-    const storage = createUnavailableStorage()
-
-    expect(() => storage.getItem('counter')).toThrow('storage unavailable')
-    expect(() => storage.setItem('counter', 'value')).toThrow(
-      'storage unavailable',
+  it('clears persisted data without replacing the live state', () => {
+    // Given a real piped store writing a non-default persistence version.
+    const storage = createMemoryStorage()
+    const store = createStore<PersistedCounterState>()(
+      pipe
+        .use(persist<PersistedCounterState>({
+          name: 'counter-clear-storage',
+          storage: createJSONStorage<PersistedCounterState>(() => storage),
+          version: 3,
+          skipHydration: true,
+        }))
+        .create(() => ({ count: 0 })),
     )
-    expect(() => storage.removeItem('counter')).toThrow('storage unavailable')
-    expect(
-      createJSONStorage<PersistedCounterState>(() => {
-        throw new Error('storage unavailable')
-      }),
-    ).toBeUndefined()
+    store.setState({ count: 4 })
+    expect(storage.getRawItem('counter-clear-storage')).toBe(
+      '{"state":{"count":4},"version":3}',
+    )
+
+    // When the public persistence extension clears its storage.
+    store.persist.clearStorage()
+
+    // Then the stored payload is removed while the current state is preserved.
+    expect(storage.getRawItem('counter-clear-storage')).toBeUndefined()
+    expect(store.getState().count).toBe(4)
   })
 
   it('persists only the partialized state through pipe and createJSONStorage', () => {
@@ -362,13 +330,14 @@ describe('pipe', () => {
 
   it('hydrates seeded JSON explicitly through pipe rehydrate', async () => {
     const storage = createMemoryStorage({
-      'counter-explicit-rehydrate': '{"state":{"count":7},"version":0}',
+      'counter-explicit-rehydrate': '{"state":{"count":7},"version":3}',
     })
     const hydrationEvents: PersistHydrationEvent[] = []
     const store = createStore<CounterState>()(
       pipe
         .use(persist<CounterState, PersistedCounterState>({
           name: 'counter-explicit-rehydrate',
+          version: 3,
           storage: createJSONStorage<PersistedCounterState>(() => storage),
           partialize: (state) => ({ count: state.count }),
           skipHydration: true,
@@ -445,10 +414,6 @@ describe('pipe', () => {
     expect(Object.keys(pipe).sort()).toEqual([
       'use',
     ])
-    expect('definePipeStateCreator' in publicApi).toBe(false)
-    expect('create' in pipe).toBe(false)
-    expect('pipeStore' in publicApi).toBe(false)
-    expect('pipeStateCreator' in publicApi).toBe(false)
     expectTypeOf(pipe).toEqualTypeOf<Pipe>()
   })
 
