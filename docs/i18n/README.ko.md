@@ -10,8 +10,10 @@ Zustand 미들웨어 스택을 실제로 생각하는 순서대로 작성하세�
 
 ## 빠른 시작
 
+기존 React 프로젝트에서 패키지와 이 예제가 사용하는 의존성을 설치하세요:
+
 ```sh
-npm install zustand-middleware-pipe zustand
+npm install zustand-middleware-pipe zustand immer
 ```
 
 ```ts
@@ -19,6 +21,11 @@ import { create } from 'zustand'
 import { pipe } from 'zustand-middleware-pipe'
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
 import { devtools, persist, subscribeWithSelector } from 'zustand-middleware-pipe/middleware'
+
+type CounterState = {
+  count: number
+  inc: () => void
+}
 
 const useCounterStore = create<CounterState>()(
   pipe
@@ -209,7 +216,7 @@ create<CounterState>()(
       count: 0,
       inc: () =>
         set((state) => {
-          state.count += 1 // ← 에러: set은 여기서 함수를 받지 않음
+          state.count += 1 // ← 에러: Immer 없는 updater는 다음 상태를 반환해야 함
         }),
     })),
 )
@@ -279,7 +286,8 @@ pipe
       wrapTemporal: (temporalCreator) =>
         pipe
           .use(
-            persist<CounterHistory, PersistedCounterHistory>({
+            // zundo 내부 필드를 포함한 creator의 전체 상태를 유지합니다.
+            persist<ReturnType<typeof temporalCreator>, PersistedCounterHistory>({
               name: 'counter-history',
               storage: createJSONStorage<PersistedCounterHistory>(() => localStorage),
               partialize: (history) => ({
@@ -370,7 +378,7 @@ npm install
 npm run verify
 ```
 
-`npm run verify`는 typecheck, Vitest, declaration build를 실행합니다.
+`npm run verify`는 typecheck, Vitest, build와 native Node export/package 검사를 실행합니다.
 
 ## 예제
 
@@ -380,4 +388,11 @@ Vite React 예제는 `examples/`에 있으며, local `file:..` dependency로 이
 npm run example:dev
 ```
 
-`npm run example:dev`는 예제를 시작하기 전에 local package를 다시 build하고 link합니다. 패키지 root에서 `npm run example:verify`를 실행하면 예제를 build하고 lint합니다.
+`npm run example:dev`는 Vite를 시작하기 전에 local package를 준비하며, 라이브러리의 `src/` 디렉터리를 감시하지 않습니다. 패키지 root에서 `npm run example:verify`를 실행하면 예제를 build하고 lint합니다.
+
+라이브러리 소스를 변경했다면 Vite를 종료하고 설치된 패키지와 의존성 캐시를 갱신하세요:
+
+```sh
+npm run example:install
+npm run dev --prefix examples -- --force
+```
