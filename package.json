@@ -50,6 +50,7 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc -p tsconfig.build.json && node scripts/fix-esm-imports.mjs",
+    "prepack": "npm run build",
     "example:install": "npm run build && rm -rf examples/node_modules/zustand-middleware-pipe && npm install --prefix examples --install-links",
     "example:dev": "npm run example:install && npm run dev --prefix examples",
     "example:build": "npm run example:install && npm run build --prefix examples",
@@ -58,8 +59,9 @@
     "example:verify": "npm run example:build && npm run example:lint",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "verify": "npm run typecheck && npm run test && npm run build && npm run test:exports",
-    "test:exports": "node test/import-exports.mjs"
+    "verify": "npm run typecheck && npm run test && npm run build && npm run test:exports && npm run test:package",
+    "test:exports": "node test/import-exports.mjs",
+    "test:package": "node --test test/package-build.mjs"
   },
   "peerDependencies": {
     "immer": ">=9.0.6",
