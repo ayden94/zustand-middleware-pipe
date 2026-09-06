@@ -59,17 +59,22 @@
     "example:verify": "npm run example:build && npm run example:lint",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "verify": "npm run typecheck && npm run test && npm run build && npm run test:exports && npm run test:package",
+    "verify": "npm run typecheck && npm run test && npm run build && npm run test:exports && npm run test:package && npm run test:consumers",
     "test:exports": "node test/import-exports.mjs",
-    "test:package": "node --test test/package-build.mjs"
+    "test:package": "node --test test/package-build.mjs",
+    "test:consumers": "node --test test/installed-consumers.mjs"
   },
   "peerDependencies": {
     "immer": ">=9.0.6",
+    "react": ">=18.0.0",
     "zundo": "^2.3.0",
     "zustand": "^5.0.8"
   },
   "peerDependenciesMeta": {
     "immer": {
+      "optional": true
+    },
+    "react": {
       "optional": true
     },
     "zundo": {

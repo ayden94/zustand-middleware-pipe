@@ -151,6 +151,8 @@ npm install immer
 npm install zundo
 ```
 
+현재 zundo 어댑터는 Zustand의 React 진입점을 import하므로 React 18 이상도 필요합니다. React 프로젝트에는 이미 설치되어 있으며, vanilla 프로젝트에서는 zundo 어댑터를 import하기 전에 `npm install react`로 추가하세요. 루트와 core middleware 진입점은 vanilla store 사용 시 React가 필요하지 않습니다.
+
 이 패키지는 **ESM-only**이며 TypeScript의 `bundler`와 `NodeNext` module resolution을 지원합니다.
 
 ---

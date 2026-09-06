@@ -151,6 +151,8 @@ npm install immer
 npm install zundo
 ```
 
+現在の zundo adapter は Zustand の React entry point を import するため、React 18 以降も必要です。React プロジェクトにはすでに含まれていますが、vanilla プロジェクトでは zundo adapter の import 前に `npm install react` で追加してください。root と core middleware の entry point は、vanilla store の利用時に React を必要としません。
+
 この package は **ESM-only** で、TypeScript の `bundler` と `NodeNext` module resolution をサポートします。
 
 ---
