@@ -85,11 +85,17 @@ function assertPipeableMiddlewareNotDuplicate(
   usedMetadata: readonly PipeableMiddlewareRuntimeMetadata[],
   nextMetadata: PipeableMiddlewareRuntimeMetadata | undefined,
 ): void {
-  if (nextMetadata === undefined || nextMetadata.duplicate === 'allow') {
+  if (nextMetadata === undefined) {
     return
   }
 
-  if (usedMetadata.some((metadata) => metadata.id === nextMetadata.id)) {
+  if (
+    usedMetadata.some(
+      (metadata) =>
+        metadata.id === nextMetadata.id &&
+        (metadata.duplicate !== 'allow' || nextMetadata.duplicate !== 'allow'),
+    )
+  ) {
     throw new TypeError(createDuplicatePipeableMiddlewareMessage(nextMetadata.id))
   }
 }

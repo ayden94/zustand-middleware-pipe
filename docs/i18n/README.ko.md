@@ -344,6 +344,8 @@ pipe
 
 `order.before`와 `order.after`는 현재 pipe chain에 실제로 존재하는 id에 대해서만 검사됩니다. 알 수 없거나 없는 target은 무시되며, cycle은 거부되고 `zustand/persist` 같은 reserved built-in id는 public userland metadata에서 재사용할 수 없습니다.
 
+같은 id를 반복하려면 모든 인스턴스가 명시적으로 `duplicate: 'allow'`를 사용해야 합니다. 기본값은 `'reject'`이며, 하나라도 중복을 거부하면 추가 순서와 관계없이 반복을 허용하지 않습니다.
+
 ---
 
 ## 중요한 caveat
