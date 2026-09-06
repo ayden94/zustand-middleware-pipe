@@ -190,7 +190,9 @@ export type PipeResolvedState<Current, Next> = unknown extends Current
 export type PipeStateCompatibility<Current, Next> = unknown extends Current
   ? unknown
   : [Next] extends [Current]
-    ? unknown
+    ? [Current] extends [Next]
+      ? unknown
+      : never
     : never
 
 export interface PipeBuilder<
