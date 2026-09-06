@@ -89,7 +89,10 @@ type PipeCanUseProducedMutator<
     ? false
     : PipeHasBuiltInMutator<SeenBuiltInMutators, Produced[0]> extends true
       ? false
-      : PipeCanBeInnerStack<CurrentStoreMutators, Produced[0]>
+      : PipeCanBeInnerStack<
+          [...CurrentStoreMutators, ...SeenBuiltInMutators],
+          Produced[0]
+        >
   : true
 
 export type PipeCanUseMiddleware<
