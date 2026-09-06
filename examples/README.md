@@ -21,7 +21,7 @@ import { temporal } from 'zustand-middleware-pipe/middleware/zundo'
 The app includes:
 
 - a full `.use(devtools()).use(subscribeWithSelector()).use(persist()).use(immer())` chain
-- a `pipe.use(temporal()).create(...)` zundo undo/redo history example
+- a `pipe.use(temporal<TemporalCounterState>()).create(...)` zundo undo/redo history example
 - a `pipe.use(devtools()).create(combine(...))` terminal helper example
 - a `pipe.use(devtools()).create(redux(...))` terminal helper example
 - route-level navigation between examples with `react-router-dom`
@@ -33,4 +33,11 @@ Run it from the repository root:
 npm run example:dev
 ```
 
-`npm run example:dev` rebuilds and links the local package before starting Vite. Use `npm run example:verify` to rebuild the local package, install it into this example, build the Vite app, and run ESLint.
+`npm run example:dev` prepares the local package before starting Vite; it does not watch the library's `src/` directory. Use `npm run example:verify` to rebuild the local package, install it into this example, build the Vite app, and run ESLint.
+
+After changing library sources, stop Vite and refresh the installed package and dependency cache from the repository root:
+
+```sh
+npm run example:install
+npm run dev --prefix examples -- --force
+```

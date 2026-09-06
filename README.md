@@ -10,8 +10,10 @@ Write stacked Zustand middleware in the order you actually think about it.
 
 ## Quick start
 
+In an existing React project, install the package and the dependencies used by this example:
+
 ```sh
-npm install zustand-middleware-pipe zustand
+npm install zustand-middleware-pipe zustand immer
 ```
 
 ```ts
@@ -19,6 +21,11 @@ import { create } from 'zustand'
 import { pipe } from 'zustand-middleware-pipe'
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
 import { devtools, persist, subscribeWithSelector } from 'zustand-middleware-pipe/middleware'
+
+type CounterState = {
+  count: number
+  inc: () => void
+}
 
 const useCounterStore = create<CounterState>()(
   pipe
@@ -209,7 +216,7 @@ create<CounterState>()(
       count: 0,
       inc: () =>
         set((state) => {
-          state.count += 1 // ← error: set does not accept a function here
+          state.count += 1 // ← error: a non-Immer updater must return the next state
         }),
     })),
 )
@@ -279,7 +286,8 @@ pipe
       wrapTemporal: (temporalCreator) =>
         pipe
           .use(
-            persist<CounterHistory, PersistedCounterHistory>({
+            // Preserve the creator's full state, including zundo internals.
+            persist<ReturnType<typeof temporalCreator>, PersistedCounterHistory>({
               name: 'counter-history',
               storage: createJSONStorage<PersistedCounterHistory>(() => localStorage),
               partialize: (history) => ({
@@ -370,7 +378,7 @@ npm install
 npm run verify
 ```
 
-`npm run verify` runs typecheck, Vitest, and declaration build.
+`npm run verify` runs typecheck, Vitest, the build, and native Node export/package checks.
 
 ## Example
 
@@ -380,4 +388,11 @@ The Vite React example lives in `examples/` and uses this package through a loca
 npm run example:dev
 ```
 
-`npm run example:dev` rebuilds and links the local package before starting the example. Use `npm run example:verify` to build and lint the example from the package root.
+`npm run example:dev` prepares the local package before starting Vite; it does not watch the library's `src/` directory. Use `npm run example:verify` to build and lint the example from the package root.
+
+After changing library sources, stop Vite and refresh the installed package and dependency cache:
+
+```sh
+npm run example:install
+npm run dev --prefix examples -- --force
+```

@@ -10,8 +10,10 @@ Zustand のミドルウェアスタックを、実際に考える順番で書け
 
 ## クイックスタート
 
+既存の React プロジェクトで、package とこの例が使う依存関係をインストールしてください:
+
 ```sh
-npm install zustand-middleware-pipe zustand
+npm install zustand-middleware-pipe zustand immer
 ```
 
 ```ts
@@ -19,6 +21,11 @@ import { create } from 'zustand'
 import { pipe } from 'zustand-middleware-pipe'
 import { immer } from 'zustand-middleware-pipe/middleware/immer'
 import { devtools, persist, subscribeWithSelector } from 'zustand-middleware-pipe/middleware'
+
+type CounterState = {
+  count: number
+  inc: () => void
+}
 
 const useCounterStore = create<CounterState>()(
   pipe
@@ -210,7 +217,7 @@ create<CounterState>()(
       count: 0,
       inc: () =>
         set((state) => {
-          state.count += 1 // ← エラー: set はここで関数を受け取りません
+          state.count += 1 // ← エラー: Immer なしの updater は次の状態を返す必要があります
         }),
     })),
 )
@@ -280,7 +287,8 @@ pipe
       wrapTemporal: (temporalCreator) =>
         pipe
           .use(
-            persist<CounterHistory, PersistedCounterHistory>({
+            // zundo の内部フィールドを含む creator 全体の状態を維持します。
+            persist<ReturnType<typeof temporalCreator>, PersistedCounterHistory>({
               name: 'counter-history',
               storage: createJSONStorage<PersistedCounterHistory>(() => localStorage),
               partialize: (history) => ({
@@ -371,7 +379,7 @@ npm install
 npm run verify
 ```
 
-`npm run verify` は typecheck、Vitest、declaration build を実行します。
+`npm run verify` は typecheck、Vitest、build、native Node の export/package 検査を実行します。
 
 ## サンプル
 
@@ -381,4 +389,11 @@ Vite React のサンプルは `examples/` にあり、local `file:..` dependency
 npm run example:dev
 ```
 
-`npm run example:dev` はサンプルを起動する前に local package を rebuild して link します。package root から `npm run example:verify` を実行すると、サンプルを build して lint します。
+`npm run example:dev` は Vite の起動前に local package を準備しますが、ライブラリの `src/` ディレクトリーを監視しません。package root から `npm run example:verify` を実行すると、サンプルを build して lint します。
+
+ライブラリの source を変更したら Vite を停止し、インストールされた package と依存関係の cache を更新してください:
+
+```sh
+npm run example:install
+npm run dev --prefix examples -- --force
+```
